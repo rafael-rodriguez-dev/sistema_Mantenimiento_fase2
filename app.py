@@ -13,7 +13,19 @@ app = Flask(__name__)
 # --- CONFIGURACIÓN DE BASE DE DATOS ---
 # Usamos SQLite local. En Render se borrará al reiniciar, 
 # pero el script /setup-fase2 la regenerará.
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///mantenimiento_v2.db'
+# --- CONFIGURACIÓN DE BASE DE DATOS INTELIGENTE ---
+# Intentamos leer la variable de Render
+database_url = os.environ.get('DATABASE_URL')
+
+if database_url:
+    # Si estamos en Render, usamos Postgres (con corrección del nombre)
+    if database_url.startswith("postgres://"):
+        database_url = database_url.replace("postgres://", "postgresql://", 1)
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+else:
+    # Si estamos en tu PC, usamos SQLite local
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///mantenimiento_v2.db'
+
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
