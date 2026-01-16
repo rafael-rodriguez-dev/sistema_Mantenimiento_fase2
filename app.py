@@ -1,41 +1,59 @@
-from flask import Flask, render_template, request, jsonify, send_file
+import os
+from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
+from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
+from werkzeug.security import generate_password_hash, check_password_hash
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from reportlab.lib.utils import ImageReader
 import qrcode
 import io
-import os
 
 app = Flask(__name__)
+app.secret_key = 'super_secreto_clave_segura' # Necesario para sesiones
 
-# --- CONFIGURACIÓN DE BASE DE DATOS ---
-# Usamos SQLite local. En Render se borrará al reiniciar, 
-# pero el script /setup-fase2 la regenerará.
 # --- CONFIGURACIÓN DE BASE DE DATOS INTELIGENTE ---
-# Intentamos leer la variable de Render
 database_url = os.environ.get('DATABASE_URL')
 
 if database_url:
-    # Si estamos en Render, usamos Postgres (con corrección del nombre)
+    # NUBE (Render) ☁️
     if database_url.startswith("postgres://"):
         database_url = database_url.replace("postgres://", "postgresql://", 1)
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 else:
-    # Si estamos en tu PC, usamos SQLite local
+    # LOCAL (PC) 💻
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///mantenimiento_v2.db'
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
+# --- CONFIGURACIÓN LOGIN ---
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login' # Si no estás logueado, te manda aquí
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
 # --- MODELOS (TABLAS) ---
+class User(UserMixin, db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(100), unique=True, nullable=False)
+    password_hash = db.Column(db.String(200), nullable=False)
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
+
 class Cliente(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nombre = db.Column(db.String(100), nullable=False)
     direccion = db.Column(db.String(200), nullable=True)
-    # Relación: Un cliente tiene muchos equipos
     equipos = db.relationship('Equipo', backref='cliente', lazy=True)
 
 class Equipo(db.Model):
@@ -45,41 +63,46 @@ class Equipo(db.Model):
     serial = db.Column(db.String(50), unique=True, nullable=False)
     ubicacion = db.Column(db.String(100), nullable=False)
     estado = db.Column(db.String(20), default="Operativo")
-    observaciones = db.Column(db.String(300), nullable=True) # Campo nuevo
-    # Llave foránea: A quién pertenece este equipo
+    observaciones = db.Column(db.String(300), nullable=True)
     cliente_id = db.Column(db.Integer, db.ForeignKey('cliente.id'), nullable=False)
 
-# --- RUTA DE INSTALACIÓN (SETUP) ---
-# ¡ESTA ES LA QUE TE FALTABA PARA RENDER!
+# --- RUTA DE INSTALACIÓN (SETUP MEJORADO) ---
 @app.route('/setup-fase2')
 def setup_db():
     try:
         with app.app_context():
-            db.create_all() # Crea las tablas vacías
+            db.create_all() # Crea tablas (incluyendo User)
             
-            # Verificamos si ya existen clientes para no duplicar
+            # 1. Crear Usuario Admin si no existe
+            if not User.query.filter_by(username='admin').first():
+                admin = User(username='admin')
+                admin.set_password('admin123') # <--- CONTRASEÑA POR DEFECTO
+                db.session.add(admin)
+                mensaje_user = "👤 Usuario 'admin' creado (Clave: admin123)."
+            else:
+                mensaje_user = "👤 El usuario 'admin' ya existe."
+
+            # 2. Crear Clientes Base
             if not Cliente.query.first():
-                # Creamos los clientes base
                 c1 = Cliente(nombre="GNB Sudameris - Torre A", direccion="Calle 72")
                 c2 = Cliente(nombre="Edificio Avianca", direccion="Calle 26")
                 db.session.add(c1)
                 db.session.add(c2)
-                db.session.commit()
-                return "✅ Base de datos creada y Clientes Iniciales (GNB/Avianca) listos!"
-            return "⚠️ La base de datos ya existe. No se hicieron cambios."
+                mensaje_cli = "🏢 Clientes base creados."
+            else:
+                mensaje_cli = "🏢 Clientes ya existían."
+            
+            db.session.commit()
+            return f"✅ SETUP COMPLETO:<br>{mensaje_user}<br>{mensaje_cli}"
     except Exception as e:
-        return f"❌ Error al configurar DB: {str(e)}"
+        return f"❌ Error: {str(e)}"
 
 # --- RUTAS PRINCIPALES ---
 @app.route('/')
+# @login_required  <--- AÚN NO ACTIVAMOS ESTO PARA NO BLOQUEARTE
 def dashboard():
-    # 1. Filtro
     cliente_id_filtrado = request.args.get('cliente_id')
-    
-    # 2. Obtener clientes para el selector
     todos_los_clientes = Cliente.query.all()
-    
-    # 3. Lógica de selección
     cliente_actual = None
     if cliente_id_filtrado:
         equipos_mostrar = Equipo.query.filter_by(cliente_id=cliente_id_filtrado).all()
@@ -127,7 +150,7 @@ def agregar_equipo():
         )
         db.session.add(nuevo)
         db.session.commit()
-        return jsonify({"mensaje": "Equipo registrado en el edificio seleccionado"})
+        return jsonify({"mensaje": "Equipo registrado"})
     except Exception as e:
         return jsonify({"mensaje": "Error: Posible serial repetido"}), 400
 
@@ -137,7 +160,6 @@ def editar_equipo(id):
     equipo = Equipo.query.get(id)
     if not equipo:
         return jsonify({"mensaje": "Equipo no encontrado"}), 404
-    
     try:
         equipo.nombre = data['nombre']
         equipo.tipo = data['tipo']
@@ -145,9 +167,8 @@ def editar_equipo(id):
         equipo.ubicacion = data['ubicacion']
         equipo.observaciones = data.get('observaciones', '')
         equipo.cliente_id = data['cliente_id']
-        
         db.session.commit()
-        return jsonify({"mensaje": "Equipo actualizado correctamente"})
+        return jsonify({"mensaje": "Equipo actualizado"})
     except Exception as e:
         return jsonify({"mensaje": "Error al actualizar"}), 400
 
@@ -160,7 +181,7 @@ def eliminar_equipo(id):
         return jsonify({"mensaje": "Equipo eliminado"})
     return jsonify({"mensaje": "No encontrado"}), 404
 
-# --- EXPORTAR PDF (CORREGIDO) ---
+# --- EXPORTAR PDF ---
 @app.route('/exportar-pdf')
 def exportar_pdf():
     cliente_id = request.args.get('cliente_id')
@@ -181,15 +202,12 @@ def exportar_pdf():
     else:
         equipos = Equipo.query.all()
 
-    # Encabezado
     c.setFont("Helvetica-Bold", 18)
     c.drawString(50, 750, titulo_reporte)
     c.setFont("Helvetica", 12)
     c.drawString(50, 735, subtitulo)
-    c.setStrokeColor(colors.black)
     c.line(50, 725, 550, 725)
-
-    y = 660  # Altura inicial ajustada
+    y = 660  
     
     for equipo in equipos:
         if y < 100:
@@ -199,7 +217,6 @@ def exportar_pdf():
             c.line(50, 740, 550, 740)
             y = 700
 
-        # QR
         contenido_qr = f"ID:{equipo.id}\nSN:{equipo.serial}"
         qr = qrcode.QRCode(box_size=5, border=1)
         qr.add_data(contenido_qr)
@@ -210,21 +227,17 @@ def exportar_pdf():
         qr_buffer.seek(0)
         c.drawImage(ImageReader(qr_buffer), 50, y, width=50, height=50)
 
-        # Textos
         c.setFont("Helvetica-Bold", 12)
         c.drawString(120, y + 35, f"{equipo.nombre}")
-        
         c.setFont("Helvetica", 10)
         c.drawString(120, y + 20, f"Tipo: {equipo.tipo} | Serial: {equipo.serial}")
         c.drawString(120, y + 5, f"Ubicación: {equipo.ubicacion}")
-
         c.setFont("Helvetica-Oblique", 9)
         c.setFillColor(colors.gray)
         obs = equipo.observaciones if equipo.observaciones else "Sin obs"
         c.drawString(120, y - 8, f"Obs: {obs}")
         c.setFillColor(colors.black)
-
-        # Estado
+        
         if equipo.estado == "Falla":
             c.setFillColor(colors.red)
         else:
