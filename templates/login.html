@@ -8,19 +8,21 @@
     <style>
         body {
             background-color: #eef2f7;
+            min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            height: 100vh;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
         }
         .login-card {
             background: white;
             padding: 2.5rem;
             border-radius: 15px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
             width: 100%;
             max-width: 400px;
+            margin: 20px; /* Para que no se pegue a los bordes en celular2 */
         }
         .brand-logo {
             font-size: 3rem;
@@ -31,6 +33,7 @@
             background-color: #6c757d;
             color: white;
             border: none;
+            text-decoration: none;
         }
         .btn-guest:hover {
             background-color: #5a6268;
@@ -44,12 +47,12 @@
         <div class="text-center mb-4">
             <div class="brand-logo">🛠️</div>
             <h3 class="fw-bold text-dark">GNB System</h3>
-            <p class="text-muted">Gestión de Activos y Mantenimiento</p>
+            <p class="text-muted">Gestión de Activos</p>
         </div>
 
         {% with messages = get_flashed_messages() %}
             {% if messages %}
-                <div class="alert alert-danger text-center py-2" role="alert">
+                <div class="alert alert-warning text-center py-2" role="alert">
                     {{ messages[0] }}
                 </div>
             {% endif %}
@@ -60,6 +63,28 @@
                 <label class="form-label fw-bold">Usuario</label>
                 <input type="text" name="username" class="form-control form-control-lg" placeholder="Ej: admin" required autofocus>
             </div>
+            
             <div class="mb-4">
                 <label class="form-label fw-bold">Contraseña</label>
-                <input type="password
+                <input type="password" name="password" class="form-control form-control-lg" placeholder="••••••" required>
+            </div>
+            
+            <div class="d-grid gap-2">
+                <button type="submit" class="btn btn-primary btn-lg">Ingresar</button>
+            </div>
+        </form>
+
+        <hr class="my-4">
+
+        <div class="text-center">
+            <p class="small text-muted mb-2">¿Solo quieres ver el portafolio?</p>
+            <div class="d-grid">
+                <a href="/login-invitado" class="btn btn-guest btn-lg">
+                    🕵️ Entrar como Invitado
+                </a>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>
