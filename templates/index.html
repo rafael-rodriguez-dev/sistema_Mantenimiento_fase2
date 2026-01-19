@@ -119,7 +119,7 @@
                                 
                                 {% if user.username != 'invitado' %}
                                 <td class="text-end">
-                                    <button class="btn btn-sm btn-outline-primary me-1" onclick='abrirEditar({{ equipo|tojson }})'>
+                                    <button class="btn btn-sm btn-outline-primary me-1" onclick='abrirEditar({{ equipo.to_dict()|tojson }})'>
                                         <i class="fas fa-edit"></i>
                                     </button>
                                     <button class="btn btn-sm btn-outline-danger" onclick="eliminarEquipo({{ equipo.id }})">
@@ -227,30 +227,25 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-    // --- Lógica del Cliente ---
     document.getElementById('formCliente').onsubmit = async (e) => {
         e.preventDefault();
         const data = {
             nombre: e.target.nombre.value,
             direccion: e.target.direccion.value
         };
-        
         const res = await fetch('/api/clientes', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(data)
         });
-
         if(res.ok) window.location.reload();
         else alert("Error al crear cliente");
     };
 
-    // --- Lógica del Equipo (Crear y Editar) ---
     const modalEquipo = new bootstrap.Modal(document.getElementById('modalEquipo'));
     
-    // Limpiar modal al abrir para nuevo
     document.getElementById('modalEquipo').addEventListener('show.bs.modal', function (event) {
-        if (!event.relatedTarget.onclick) { // Si no viene del botón editar
+        if (!event.relatedTarget.onclick) { 
             document.getElementById('formEquipo').reset();
             document.getElementById('equipoId').value = '';
             document.getElementById('tituloModalEquipo').innerText = 'Nuevo Equipo';
@@ -269,26 +264,18 @@
             estado: e.target.estado.value,
             observaciones: e.target.observaciones.value
         };
-
         const metodo = id ? 'PUT' : 'POST';
         const url = id ? `/api/equipos/${id}` : '/api/equipos';
-
         const res = await fetch(url, {
             method: metodo,
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(data)
         });
-
         const result = await res.json();
-
-        if(res.ok) {
-            window.location.reload();
-        } else {
-            alert(result.mensaje || "Error en la operación");
-        }
+        if(res.ok) window.location.reload();
+        else alert(result.mensaje || "Error");
     };
 
-    // Función para cargar datos en el modal de edición
     window.abrirEditar = (equipo) => {
         document.getElementById('equipoId').value = equipo.id;
         document.getElementById('tituloModalEquipo').innerText = 'Editar Equipo';
@@ -305,13 +292,11 @@
         modalEquipo.show();
     };
 
-    // Función eliminar
     window.eliminarEquipo = async (id) => {
-        if(!confirm('¿Seguro que deseas eliminar este equipo?')) return;
-        
+        if(!confirm('¿Seguro?')) return;
         const res = await fetch(`/api/equipos/${id}`, { method: 'DELETE' });
         if(res.ok) window.location.reload();
-        else alert("No se pudo eliminar (verifica permisos)");
+        else alert("No se pudo eliminar");
     };
 </script>
 

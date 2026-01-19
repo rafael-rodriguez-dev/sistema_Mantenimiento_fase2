@@ -11,14 +11,14 @@ import qrcode
 import io
 
 app = Flask(__name__)
-# ¡IMPORTANTE! Clave para encriptar las cookies de sesión
+# Clave secreta para sesiones
 app.secret_key = 'super_secreto_clave_segura_gnb'
 
 # --- CONFIGURACIÓN DE BASE DE DATOS ---
 database_url = os.environ.get('DATABASE_URL')
 
 if database_url:
-    # NUBE (Render) - Corrección automática de postgres:// a postgresql://
+    # NUBE (Render) - Corrección automática
     if database_url.startswith("postgres://"):
         database_url = database_url.replace("postgres://", "postgresql://", 1)
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
@@ -30,16 +30,16 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
-# --- CONFIGURACIÓN DE LOGIN ---
+# --- LOGIN ---
 login_manager = LoginManager()
 login_manager.init_app(app)
-login_manager.login_view = 'login' # Redirige aquí si no estás logueado
+login_manager.login_view = 'login'
 
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# --- MODELOS DE LA BASE DE DATOS ---
+# --- MODELOS ---
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(100), unique=True, nullable=False)
@@ -67,7 +67,20 @@ class Equipo(db.Model):
     observaciones = db.Column(db.String(300), nullable=True)
     cliente_id = db.Column(db.Integer, db.ForeignKey('cliente.id'), nullable=False)
 
-# --- RUTAS DE LOGIN Y SEGURIDAD ---
+    # ESTA ES LA FUNCIÓN NUEVA QUE ARREGLA EL ERROR
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'nombre': self.nombre,
+            'tipo': self.tipo,
+            'serial': self.serial,
+            'ubicacion': self.ubicacion,
+            'estado': self.estado,
+            'observaciones': self.observaciones,
+            'cliente_id': self.cliente_id
+        }
+
+# --- RUTAS ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
@@ -76,7 +89,6 @@ def login():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-        
         user = User.query.filter_by(username=username).first()
         
         if user and user.check_password(password):
@@ -89,13 +101,12 @@ def login():
 
 @app.route('/login-invitado')
 def login_invitado():
-    # Busca al usuario invitado en la BD
     user = User.query.filter_by(username='invitado').first()
     if user:
         login_user(user)
         return redirect(url_for('dashboard'))
     else:
-        flash("Error: El usuario invitado no existe. Ejecuta /setup-fase2")
+        flash("Error: Ejecuta /setup-fase2 primero")
         return redirect(url_for('login'))
 
 @app.route('/logout')
@@ -104,45 +115,34 @@ def logout():
     logout_user()
     return redirect(url_for('login'))
 
-# --- RUTA DE INSTALACIÓN (SETUP) ---
 @app.route('/setup-fase2')
 def setup_db():
     try:
         with app.app_context():
             db.create_all()
-            
-            mensaje = []
-            
-            # 1. Crear Admin
             if not User.query.filter_by(username='admin').first():
                 admin = User(username='admin')
                 admin.set_password('admin123')
                 db.session.add(admin)
-                mensaje.append("👤 Admin creado (Clave: admin123)")
             
-            # 2. Crear Invitado
             if not User.query.filter_by(username='invitado').first():
                 guest = User(username='invitado')
-                guest.set_password('invitado') # La clave no importa, entra directo
+                guest.set_password('invitado')
                 db.session.add(guest)
-                mensaje.append("🕵️ Invitado creado")
 
-            # 3. Crear Clientes Base
             if not Cliente.query.first():
                 c1 = Cliente(nombre="GNB Sudameris - Torre A", direccion="Calle 72")
                 c2 = Cliente(nombre="Edificio Avianca", direccion="Calle 26")
                 db.session.add(c1)
                 db.session.add(c2)
-                mensaje.append("🏢 Clientes base creados")
             
             db.session.commit()
-            return f"✅ SETUP COMPLETO:<br>" + "<br>".join(mensaje)
+            return "✅ SETUP COMPLETO. Usuarios 'admin' e 'invitado' creados."
     except Exception as e:
         return f"❌ Error: {str(e)}"
 
-# --- DASHBOARD PRINCIPAL ---
 @app.route('/')
-@login_required # Candado puesto 🔒
+@login_required
 def dashboard():
     cliente_id_filtrado = request.args.get('cliente_id')
     todos_los_clientes = Cliente.query.all()
@@ -154,14 +154,13 @@ def dashboard():
     else:
         equipos_mostrar = Equipo.query.all()
 
-    # Renderizamos pasando 'user=current_user' para que el HTML sepa quién es
     return render_template('index.html', 
                            equipos=equipos_mostrar, 
                            clientes=todos_los_clientes,
                            cliente_actual=cliente_actual,
                            user=current_user)
 
-# --- API (CRUD DE CLIENTES Y EQUIPOS) ---
+# --- API ---
 @app.route('/api/clientes', methods=['GET'])
 @login_required
 def obtener_clientes():
@@ -172,29 +171,22 @@ def obtener_clientes():
 @app.route('/api/clientes', methods=['POST'])
 @login_required
 def crear_cliente():
-    # BLOQUEO MODO INVITADO
     if current_user.username == 'invitado':
         return jsonify({"mensaje": "⚠️ Modo Invitado: Solo lectura"}), 403
-
     datos = request.json
     try:
-        nuevo_cliente = Cliente(
-            nombre=datos['nombre'],
-            direccion=datos.get('direccion', 'Sin dirección')
-        )
-        db.session.add(nuevo_cliente)
+        nuevo = Cliente(nombre=datos['nombre'], direccion=datos.get('direccion', ''))
+        db.session.add(nuevo)
         db.session.commit()
-        return jsonify({"mensaje": "Cliente creado exitosamente"})
+        return jsonify({"mensaje": "Cliente creado"})
     except Exception as e:
-        return jsonify({"mensaje": f"Error: {str(e)}"}), 400
+        return jsonify({"mensaje": str(e)}), 400
 
 @app.route('/api/equipos', methods=['POST'])
 @login_required
 def agregar_equipo():
-    # BLOQUEO MODO INVITADO
     if current_user.username == 'invitado':
         return jsonify({"mensaje": "⚠️ Modo Invitado: Solo lectura"}), 403
-
     data = request.json
     try:
         nuevo = Equipo(
@@ -209,47 +201,42 @@ def agregar_equipo():
         db.session.commit()
         return jsonify({"mensaje": "Equipo registrado"})
     except Exception as e:
-        return jsonify({"mensaje": "Error: Posible serial repetido"}), 400
+        return jsonify({"mensaje": "Error: Serial repetido"}), 400
 
 @app.route('/api/equipos/<int:id>', methods=['PUT'])
 @login_required
 def editar_equipo(id):
-    # BLOQUEO MODO INVITADO
     if current_user.username == 'invitado':
         return jsonify({"mensaje": "⚠️ Modo Invitado: Solo lectura"}), 403
-
     data = request.json
     equipo = Equipo.query.get(id)
-    if not equipo:
-        return jsonify({"mensaje": "Equipo no encontrado"}), 404
+    if not equipo: return jsonify({"mensaje": "No encontrado"}), 404
     try:
         equipo.nombre = data['nombre']
         equipo.tipo = data['tipo']
         equipo.serial = data['serial']
         equipo.ubicacion = data['ubicacion']
+        equipo.estado = data.get('estado', equipo.estado)
         equipo.observaciones = data.get('observaciones', '')
         equipo.cliente_id = data['cliente_id']
-        equipo.estado = data.get('estado', equipo.estado) # Permitir cambiar estado
         db.session.commit()
         return jsonify({"mensaje": "Equipo actualizado"})
-    except Exception as e:
+    except Exception:
         return jsonify({"mensaje": "Error al actualizar"}), 400
 
 @app.route('/api/equipos/<int:id>', methods=['DELETE'])
 @login_required
 def eliminar_equipo(id):
-    # BLOQUEO MODO INVITADO
     if current_user.username == 'invitado':
         return jsonify({"mensaje": "⚠️ Modo Invitado: Solo lectura"}), 403
-
     equipo = Equipo.query.get(id)
     if equipo:
         db.session.delete(equipo)
         db.session.commit()
-        return jsonify({"mensaje": "Equipo eliminado"})
+        return jsonify({"mensaje": "Eliminado"})
     return jsonify({"mensaje": "No encontrado"}), 404
 
-# --- EXPORTAR PDF ---
+# --- PDF ---
 @app.route('/exportar-pdf')
 @login_required
 def exportar_pdf():
@@ -257,72 +244,41 @@ def exportar_pdf():
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=letter)
     c.setTitle("Reporte de Mantenimiento")
-
-    titulo_reporte = "Reporte Global de Activos"
-    subtitulo = "Listado General"
+    
+    titulo = "Reporte Global"
     equipos = []
-
     if cliente_id:
-        cliente = Cliente.query.get(cliente_id)
-        if cliente:
-            titulo_reporte = f"Cliente: {cliente.nombre}"
-            subtitulo = f"Sede: {cliente.direccion or 'Principal'}"
-            equipos = cliente.equipos
+        cli = Cliente.query.get(cliente_id)
+        if cli:
+            titulo = f"Cliente: {cli.nombre}"
+            equipos = cli.equipos
     else:
         equipos = Equipo.query.all()
 
-    # Encabezado
-    c.setFont("Helvetica-Bold", 18)
-    c.drawString(50, 750, titulo_reporte)
-    c.setFont("Helvetica", 12)
-    c.drawString(50, 735, subtitulo)
-    c.line(50, 725, 550, 725)
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(50, 750, titulo)
+    y = 700
     
-    y = 680
-    
-    for equipo in equipos:
-        if y < 100: # Nueva página si se acaba el espacio jjj
+    for eq in equipos:
+        if y < 100:
             c.showPage()
-            c.setFont("Helvetica-Bold", 10)
-            c.drawString(50, 750, f"Continuación: {titulo_reporte}")
-            c.line(50, 740, 550, 740)
-            y = 700
-
-        # Generar QR en memoria
-        contenido_qr = f"ID:{equipo.id}\nSN:{equipo.serial}"
-        qr = qrcode.QRCode(box_size=5, border=1)
-        qr.add_data(contenido_qr)
-        qr.make(fit=True)
-        img_qr = qr.make_image(fill_color="black", back_color="white")
+            y = 750
         
-        qr_buffer = io.BytesIO()
-        img_qr.save(qr_buffer, format="PNG")
-        qr_buffer.seek(0)
-
-        # Dibujar QR e Info
-        c.drawImage(ImageReader(qr_buffer), 50, y, width=50, height=50)
-
+        qr = qrcode.make(f"ID:{eq.id}-SN:{eq.serial}")
+        qr_mem = io.BytesIO()
+        qr.save(qr_mem, format="PNG")
+        qr_mem.seek(0)
+        c.drawImage(ImageReader(qr_mem), 50, y-10, 40, 40)
+        
         c.setFont("Helvetica-Bold", 12)
-        c.drawString(120, y + 35, f"{equipo.nombre}")
+        c.drawString(100, y+20, f"{eq.nombre} ({eq.estado})")
         c.setFont("Helvetica", 10)
-        c.drawString(120, y + 20, f"Tipo: {equipo.tipo} | Serial: {equipo.serial}")
-        c.drawString(120, y + 5, f"Ubicación: {equipo.ubicacion}")
+        c.drawString(100, y+5, f"{eq.tipo} | SN: {eq.serial} | {eq.ubicacion}")
+        y -= 60
         
-        # Color del estado
-        if equipo.estado == "Falla":
-            c.setFillColor(colors.red)
-        else:
-            c.setFillColor(colors.green)
-        c.drawString(450, y + 35, equipo.estado)
-        c.setFillColor(colors.black)
-
-        c.setStrokeColor(colors.lightgrey)
-        c.line(50, y - 10, 550, y - 10)
-        y -= 70
-
     c.save()
     buffer.seek(0)
-    return send_file(buffer, as_attachment=True, download_name="reporte_mantenimiento.pdf", mimetype='application/pdf')
+    return send_file(buffer, as_attachment=True, download_name="reporte.pdf", mimetype='application/pdf')
 
 if __name__ == '__main__':
     with app.app_context():
