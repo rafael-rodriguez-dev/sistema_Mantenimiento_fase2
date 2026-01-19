@@ -3,373 +3,317 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GNB - Gestión Multi-Cliente</title>
+    <title>Dashboard - GNB Mantenimiento</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        /* ESTILOS (CSS) */
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
-        body { background-color: #f0f2f5; color: #333; }
-        .main-container { max-width: 1100px; margin: 30px auto; background: white; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); padding: 20px; }
-        
-        /* Header */
-        .dashboard-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; border-bottom: 2px solid #ecf0f1; margin-bottom: 20px; }
-        .logo-area h1 { color: #2c3e50; font-size: 24px; }
-        .user-info { display: flex; align-items: center; gap: 10px; background: #eef2f7; padding: 8px 15px; border-radius: 20px; font-weight: bold; color: #2980b9; }
-
-        /* Acciones */
-        .actions-bar { display: flex; justify-content: space-between; margin-bottom: 15px; }
-        .btn-primary { background-color: #2980b9; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; text-decoration: none; }
-        .btn-danger { background-color: #c0392b; color: white; }
-        .btn-small { border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 14px; margin-right: 5px; }
-        
-        /* Tabla */
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        thead { background-color: #f8f9fa; }
-        th { text-align: left; padding: 12px; font-size: 13px; color: #7f8c8d; border-bottom: 2px solid #ddd; }
-        td { padding: 12px; border-bottom: 1px solid #eee; font-size: 14px; }
-        
-        /* Badges y Tags */
-        .status-badge { padding: 5px 10px; border-radius: 12px; font-size: 12px; font-weight: bold; }
-        .status-ok { background-color: #e8f8f5; color: #27ae60; }
-        .status-fail { background-color: #fdedec; color: #c0392b; }
-        .client-tag { background: #eaf2f8; color: #2980b9; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; border: 1px solid #a9cce3; }
-
-        /* Modal */
-        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
-        .modal-box { background: white; padding: 25px; border-radius: 8px; width: 500px; max-width: 90%; }
-        .form-group { margin-bottom: 15px; }
-        label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; }
-        input, select, textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; }
-        .btn-secondary { background: #95a5a6; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; }
+        .sidebar { min-height: 100vh; background-color: #2c3e50; color: white; }
+        .sidebar a { color: #bdc3c7; text-decoration: none; display: block; padding: 10px 15px; }
+        .sidebar a:hover, .sidebar a.active { background-color: #34495e; color: white; border-left: 4px solid #3498db; }
+        .status-badge { font-size: 0.85em; }
     </style>
 </head>
 <body>
 
-    <div class="main-container">
-        <header class="dashboard-header">
-            <div class="logo-area">
-                <h1>
-                    {% if cliente_actual %}
-                        🏢 {{ cliente_actual.nombre }}
-                    {% else %}
-                        🌐 Gestión Global
-                    {% endif %}
-                </h1>
-                <p>Sistema Centralizado de Mantenimiento</p>
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-2 sidebar p-0">
+            <div class="p-3 text-center border-bottom border-secondary">
+                <h4>🛠️ GNB Mant.</h4>
+                <small class="text-muted">
+                    Hola, {{ user.username }} 
+                    {% if user.username == 'invitado' %}(👀){% endif %}
+                </small>
             </div>
             
-            <div class="user-info" style="gap: 5px;">
-                <select onchange="filtrarCliente(this.value)" style="padding: 5px; border-radius: 5px; border: 1px solid #bdc3c7;">
-                    <option value="">🌎 Ver Todos</option>
-                    {% for c in clientes %}
-                        <option value="{{ c.id }}" {% if cliente_actual and cliente_actual.id == c.id %}selected{% endif %}>
-                            🏢 {{ c.nombre }}
-                        </option>
-                    {% endfor %}
-                </select>
-                
-                <button onclick="abrirModalCliente()" style="background: #27ae60; color: white; border: none; border-radius: 4px; padding: 5px 10px; cursor: pointer; font-weight: bold;" title="Crear Nuevo Edificio/Cliente">+</button>
-                
-                <span style="margin-left: 10px;">Ingeniero</span>
-            </div>
-        </header>
-
-        <div class="actions-bar">
-            <h2>Inventario de Dispositivos</h2>
-            <div>
-                <a href="/exportar-pdf" id="btnPdf" class="btn-primary" style="background-color: #e74c3c; margin-right: 10px;">📄 PDF Reporte</a>
-                
-                <button class="btn-primary" onclick="abrirModal()">+ Nuevo Equipo</button>
-            </div>
-        </div>
-
-        <table>
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Cliente / Edificio</th>
-                    <th>Equipo</th>
-                    <th>Serial</th>
-                    <th>Ubicación</th>
-                    <th>Observaciones</th> <th>Estado</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for equipo in equipos %}
-                <tr>
-                    <td>#{{ equipo.id }}</td>
-                    <td><span class="client-tag">🏢 {{ equipo.cliente.nombre }}</span></td>
-                    <td><strong>{{ equipo.nombre }}</strong><br><small>{{ equipo.tipo }}</small></td>
-                    <td><code>{{ equipo.serial }}</code></td>
-                    <td>{{ equipo.ubicacion }}</td>
-                    
-                    <td style="font-style: italic; color: #666; font-size: 13px; max-width: 200px;">
-                        {{ equipo.observaciones or '' }}
-                    </td>
-
-                    <td>
-                        <span class="status-badge {{ 'status-ok' if equipo.estado == 'Operativo' else 'status-fail' }}">
-                            {{ equipo.estado }}
-                        </span>
-                    </td>
-                    <td>
-                        <button class="btn-small" style="background-color: #f1c40f;"
-                            onclick="editarEquipo(
-                                '{{ equipo.id }}', 
-                                '{{ equipo.cliente_id }}'
-                            )">
-                            ✏️
-                        </button>
-                        <input type="hidden" id="data-nombre-{{ equipo.id }}" value="{{ equipo.nombre }}">
-                        <input type="hidden" id="data-tipo-{{ equipo.id }}" value="{{ equipo.tipo }}">
-                        <input type="hidden" id="data-serial-{{ equipo.id }}" value="{{ equipo.serial }}">
-                        <input type="hidden" id="data-ubicacion-{{ equipo.id }}" value="{{ equipo.ubicacion }}">
-                        <input type="hidden" id="data-obs-{{ equipo.id }}" value="{{ equipo.observaciones or '' }}">
-
-                        <button class="btn-small btn-danger" onclick="eliminarEquipo({{ equipo.id }})">🗑️</button>
-                    </td>
-                </tr>
-                {% else %}
-                <tr><td colspan="8" style="text-align: center;">No hay equipos registrados.</td></tr>
+            <div class="p-2">
+                <small class="text-uppercase text-muted ms-2">Clientes</small>
+                <a href="/" class="{{ 'active' if not cliente_actual else '' }}">
+                    <i class="fas fa-layer-group me-2"></i> Todos los Equipos
+                </a>
+                {% for cliente in clientes %}
+                <a href="/?cliente_id={{ cliente.id }}" class="{{ 'active' if cliente_actual and cliente_actual.id == cliente.id else '' }}">
+                    <i class="fas fa-building me-2"></i> {{ cliente.nombre }}
+                </a>
                 {% endfor %}
-            </tbody>
-        </table>
-    </div>
+            </div>
 
-    <div id="modalAgregar" class="modal-overlay">
-        <div class="modal-box">
-            <h3 id="modalTitle">🔌 Datos del Dispositivo</h3>
+            {% if user.username != 'invitado' %}
+            <div class="p-3 mt-4">
+                <button class="btn btn-primary w-100 btn-sm" data-bs-toggle="modal" data-bs-target="#modalCliente">
+                    <i class="fas fa-plus"></i> Nuevo Cliente
+                </button>
+            </div>
+            {% endif %}
+
+            <div class="p-3 mt-auto border-top border-secondary">
+                <a href="/logout" class="text-danger"><i class="fas fa-sign-out-alt me-2"></i> Cerrar Sesión</a>
+            </div>
+        </div>
+
+        <div class="col-md-10 bg-light p-4">
             
-            <div class="form-group">
-                <label>Cliente (Edificio):</label>
-                <select id="inpCliente">
-                    <option value="">Cargando clientes...</option>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label>Nombre del Equipo:</label>
-                <input type="text" id="inpNombre" placeholder="Ej: Sensor Humo">
-            </div>
-
-            <div class="form-group" style="display: flex; gap: 10px;">
-                <div style="flex: 1;">
-                    <label>Tipo:</label>
-                    <select id="inpTipo">
-                        <option value="Panel Control">Panel Control</option>
-                        <option value="Sensor Humo">Sensor Humo</option>
-                        <option value="Estación Manual">Estación Manual</option>
-                        <option value="Bomba">Bomba Contra Incendio</option>
-                    </select>
-                </div>
-                <div style="flex: 1;">
-                    <label>Serial:</label>
-                    <input type="text" id="inpSerial" placeholder="SN-123">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>
+                    {% if cliente_actual %}
+                        📂 {{ cliente_actual.nombre }} <span class="text-muted fs-6">({{ cliente_actual.direccion }})</span>
+                    {% else %}
+                        🌎 Vista Global de Activos
+                    {% endif %}
+                </h2>
+                <div>
+                    <a href="/exportar-pdf{{ '?cliente_id=' ~ cliente_actual.id if cliente_actual else '' }}" class="btn btn-danger me-2">
+                        <i class="fas fa-file-pdf"></i> Exportar PDF
+                    </a>
+                    
+                    {% if user.username != 'invitado' %}
+                    <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalEquipo">
+                        <i class="fas fa-plus"></i> Agregar Equipo
+                    </button>
+                    {% endif %}
                 </div>
             </div>
 
-            <div class="form-group">
-                <label>Ubicación:</label>
-                <input type="text" id="inpUbicacion" placeholder="Ej: Sótano 1">
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-body">
+                            <h6 class="text-muted">Total Equipos</h6>
+                            <h3>{{ equipos|length }}</h3>
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <div class="form-group">
-                <label>Observaciones:</label>
-                <textarea id="inpObservaciones" rows="2" placeholder="Notas adicionales..."></textarea>
+            <div class="card shadow-sm">
+                <div class="card-body p-0">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Estado</th>
+                                <th>Nombre</th>
+                                <th>Tipo</th>
+                                <th>Serial</th>
+                                <th>Ubicación</th>
+                                <th>Cliente</th>
+                                {% if user.username != 'invitado' %}
+                                <th class="text-end">Acciones</th>
+                                {% endif %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for equipo in equipos %}
+                            <tr>
+                                <td>
+                                    {% if equipo.estado == 'Operativo' %}
+                                        <span class="badge bg-success status-badge">OK</span>
+                                    {% else %}
+                                        <span class="badge bg-danger status-badge">Falla</span>
+                                    {% endif %}
+                                </td>
+                                <td class="fw-bold">{{ equipo.nombre }}</td>
+                                <td>{{ equipo.tipo }}</td>
+                                <td><code>{{ equipo.serial }}</code></td>
+                                <td>{{ equipo.ubicacion }}</td>
+                                <td><small class="text-muted">{{ equipo.cliente.nombre }}</small></td>
+                                
+                                {% if user.username != 'invitado' %}
+                                <td class="text-end">
+                                    <button class="btn btn-sm btn-outline-primary me-1" onclick='abrirEditar({{ equipo|tojson }})'>
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" onclick="eliminarEquipo({{ equipo.id }})">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                                {% endif %}
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="7" class="text-center py-5 text-muted">
+                                    <i class="fas fa-box-open fa-3x mb-3"></i><br>
+                                    No hay equipos registrados aún.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
-            <div style="text-align: right; margin-top: 20px;">
-                <button onclick="cerrarModal()" class="btn-secondary">Cancelar</button>
-                <button id="btnGuardar" onclick="guardarEquipo()" class="btn-primary">Guardar</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalCliente" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Nuevo Cliente</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formCliente">
+                    <div class="mb-3">
+                        <label>Nombre Empresa</label>
+                        <input type="text" class="form-control" name="nombre" required>
+                    </div>
+                    <div class="mb-3">
+                        <label>Dirección / Sede</label>
+                        <input type="text" class="form-control" name="direccion">
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Guardar</button>
+                </form>
             </div>
         </div>
     </div>
-    <div id="modalCliente" class="modal-overlay">
-        <div class="modal-box" style="width: 400px;"> <h3>🏢 Nuevo Edificio / Cliente</h3>
-            
-            <div class="form-group">
-                <label>Nombre del Cliente:</label>
-                <input type="text" id="cliNombre" placeholder="Ej: Torre Colpatria">
-            </div>
+</div>
 
-            <div class="form-group">
-                <label>Dirección:</label>
-                <input type="text" id="cliDireccion" placeholder="Ej: Cra 7 # 24-89">
+<div class="modal fade" id="modalEquipo" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="tituloModalEquipo">Nuevo Equipo</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-
-            <div style="text-align: right; margin-top: 20px;">
-                <button onclick="document.getElementById('modalCliente').style.display='none'" class="btn-secondary">Cancelar</button>
-                <button onclick="guardarCliente()" class="btn-primary">Crear Cliente</button>
+            <div class="modal-body">
+                <form id="formEquipo">
+                    <input type="hidden" name="id" id="equipoId">
+                    <div class="mb-3">
+                        <label>Cliente</label>
+                        <select class="form-select" name="cliente_id" id="selectCliente" required>
+                            {% for cliente in clientes %}
+                            <option value="{{ cliente.id }}" {{ 'selected' if cliente_actual and cliente_actual.id == cliente.id else '' }}>
+                                {{ cliente.nombre }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label>Nombre Equipo</label>
+                            <input type="text" class="form-control" name="nombre" required placeholder="Ej: Aire Acondicionado">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label>Tipo</label>
+                            <input type="text" class="form-control" name="tipo" required placeholder="Ej: HVAC">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label>Serial</label>
+                        <input type="text" class="form-control" name="serial" required>
+                    </div>
+                    <div class="mb-3">
+                        <label>Ubicación</label>
+                        <input type="text" class="form-control" name="ubicacion" required placeholder="Ej: Piso 3 - Cuarto Técnico">
+                    </div>
+                    <div class="mb-3">
+                        <label>Estado</label>
+                        <select class="form-select" name="estado">
+                            <option value="Operativo">Operativo 🟢</option>
+                            <option value="Falla">En Falla 🔴</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label>Observaciones</label>
+                        <textarea class="form-control" name="observaciones" rows="2"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-success w-100">Guardar Equipo</button>
+                </form>
             </div>
         </div>
     </div>
+</div>
 
-    <script>
-        const modal = document.getElementById('modalAgregar');
-        const selectCliente = document.getElementById('inpCliente');
-        let idEnEdicion = null; 
-
-        // 1. Lógica de Filtrado y Actualización de PDF
-        function filtrarCliente(id) {
-            if (id) {
-                window.location.href = '/?cliente_id=' + id;
-            } else {
-                window.location.href = '/'; 
-            }
-        }
-
-        // 2. Carga Inicial
-        document.addEventListener('DOMContentLoaded', () => {
-            const params = new URLSearchParams(window.location.search);
-            const clienteActualId = params.get('cliente_id');
-            const btnPdf = document.getElementById('btnPdf');
-
-            // --- AQUÍ ESTÁ LA MAGIA ---
-            // Si hay un cliente filtrado, le avisamos al botón PDF
-            if (clienteActualId) {
-                btnPdf.href = '/exportar-pdf?cliente_id=' + clienteActualId;
-            }
-
-            fetch('/api/clientes')
-                .then(res => res.json())
-                .then(clientes => {
-                    selectCliente.innerHTML = '<option value="">-- Seleccione Cliente --</option>';
-                    clientes.forEach(c => {
-                        let option = document.createElement('option');
-                        option.value = c.id;
-                        option.text = c.nombre;
-                        if (clienteActualId && c.id == clienteActualId) {
-                            option.selected = true;
-                        }
-                        selectCliente.appendChild(option);
-                    });
-                })
-                .catch(err => console.error("Error cargando clientes:", err));
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    // --- Lógica del Cliente ---
+    document.getElementById('formCliente').onsubmit = async (e) => {
+        e.preventDefault();
+        const data = {
+            nombre: e.target.nombre.value,
+            direccion: e.target.direccion.value
+        };
+        
+        const res = await fetch('/api/clientes', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
         });
 
-        // 3. Abrir Modal
-        function abrirModal() { 
-            idEnEdicion = null; 
-            document.getElementById('modalTitle').innerText = "🔌 Nuevo Dispositivo";
-            document.getElementById('btnGuardar').innerText = "Guardar Nuevo";
-            
-            document.getElementById('inpNombre').value = "";
-            document.getElementById('inpSerial').value = "";
-            document.getElementById('inpUbicacion').value = "";
-            document.getElementById('inpObservaciones').value = "";
-            
-            modal.style.display = 'flex'; 
+        if(res.ok) window.location.reload();
+        else alert("Error al crear cliente");
+    };
+
+    // --- Lógica del Equipo (Crear y Editar) ---
+    const modalEquipo = new bootstrap.Modal(document.getElementById('modalEquipo'));
+    
+    // Limpiar modal al abrir para nuevo
+    document.getElementById('modalEquipo').addEventListener('show.bs.modal', function (event) {
+        if (!event.relatedTarget.onclick) { // Si no viene del botón editar
+            document.getElementById('formEquipo').reset();
+            document.getElementById('equipoId').value = '';
+            document.getElementById('tituloModalEquipo').innerText = 'Nuevo Equipo';
         }
+    });
 
-        function cerrarModal() { 
-            modal.style.display = 'none'; 
+    document.getElementById('formEquipo').onsubmit = async (e) => {
+        e.preventDefault();
+        const id = document.getElementById('equipoId').value;
+        const data = {
+            cliente_id: document.getElementById('selectCliente').value,
+            nombre: e.target.nombre.value,
+            tipo: e.target.tipo.value,
+            serial: e.target.serial.value,
+            ubicacion: e.target.ubicacion.value,
+            estado: e.target.estado.value,
+            observaciones: e.target.observaciones.value
+        };
+
+        const metodo = id ? 'PUT' : 'POST';
+        const url = id ? `/api/equipos/${id}` : '/api/equipos';
+
+        const res = await fetch(url, {
+            method: metodo,
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+
+        const result = await res.json();
+
+        if(res.ok) {
+            window.location.reload();
+        } else {
+            alert(result.mensaje || "Error en la operación");
         }
+    };
 
-        // 4. Editar
-        function editarEquipo(id, clienteId) {
-            idEnEdicion = id;
-            
-            const nombre = document.getElementById('data-nombre-' + id).value;
-            const tipo = document.getElementById('data-tipo-' + id).value;
-            const serial = document.getElementById('data-serial-' + id).value;
-            const ubicacion = document.getElementById('data-ubicacion-' + id).value;
-            const observaciones = document.getElementById('data-obs-' + id).value;
+    // Función para cargar datos en el modal de edición
+    window.abrirEditar = (equipo) => {
+        document.getElementById('equipoId').value = equipo.id;
+        document.getElementById('tituloModalEquipo').innerText = 'Editar Equipo';
+        
+        const form = document.getElementById('formEquipo');
+        form.nombre.value = equipo.nombre;
+        form.tipo.value = equipo.tipo;
+        form.serial.value = equipo.serial;
+        form.ubicacion.value = equipo.ubicacion;
+        form.estado.value = equipo.estado;
+        form.observaciones.value = equipo.observaciones || '';
+        document.getElementById('selectCliente').value = equipo.cliente_id;
 
-            document.getElementById('inpNombre').value = nombre;
-            document.getElementById('inpTipo').value = tipo;
-            document.getElementById('inpSerial').value = serial;
-            document.getElementById('inpUbicacion').value = ubicacion;
-            document.getElementById('inpObservaciones').value = observaciones;
-            document.getElementById('inpCliente').value = clienteId;
+        modalEquipo.show();
+    };
 
-            document.getElementById('modalTitle').innerText = "✏️ Editar Dispositivo";
-            document.getElementById('btnGuardar').innerText = "Actualizar";
-            
-            modal.style.display = 'flex';
-        }
+    // Función eliminar
+    window.eliminarEquipo = async (id) => {
+        if(!confirm('¿Seguro que deseas eliminar este equipo?')) return;
+        
+        const res = await fetch(`/api/equipos/${id}`, { method: 'DELETE' });
+        if(res.ok) window.location.reload();
+        else alert("No se pudo eliminar (verifica permisos)");
+    };
+</script>
 
-        // 5. Guardar
-        function guardarEquipo() {
-            const datos = {
-                cliente_id: selectCliente.value,
-                nombre: document.getElementById('inpNombre').value,
-                tipo: document.getElementById('inpTipo').value,
-                serial: document.getElementById('inpSerial').value,
-                ubicacion: document.getElementById('inpUbicacion').value,
-                observaciones: document.getElementById('inpObservaciones').value
-            };
-
-            if(!datos.cliente_id || !datos.nombre || !datos.serial) {
-                alert("⚠️ Por favor completa: Cliente, Nombre y Serial.");
-                return;
-            }
-
-            let url = '/api/equipos';
-            let metodo = 'POST';
-
-            if (idEnEdicion !== null) {
-                url = '/api/equipos/' + idEnEdicion;
-                metodo = 'PUT';
-            }
-
-            fetch(url, {
-                method: metodo,
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(datos)
-            })
-            .then(res => res.json())
-            .then(data => {
-                alert(data.mensaje);
-                location.reload();
-            })
-            .catch(err => {
-                console.error(err);
-                alert("Error al guardar. Verifica la consola.");
-            });
-        }
-
-        // 6. Eliminar
-        function eliminarEquipo(id) {
-            if(confirm("¿Seguro de borrar este equipo?")) {
-                fetch('/api/equipos/' + id, { method: 'DELETE' })
-                .then(res => res.json())
-                .then(data => {
-                    alert(data.mensaje);
-                    location.reload();
-                });
-            }
-        }
-
-        window.onclick = function(event) {
-            if (event.target == modal) { cerrarModal(); }
-        }
-    // --- LÓGICA PARA NUEVO CLIENTE ---
-        function abrirModalCliente() {
-            document.getElementById('cliNombre').value = "";
-            document.getElementById('cliDireccion').value = "";
-            document.getElementById('modalCliente').style.display = 'flex';
-        }
-
-        function guardarCliente() {
-            const nombre = document.getElementById('cliNombre').value;
-            const direccion = document.getElementById('cliDireccion').value;
-
-            if(!nombre) {
-                alert("El nombre es obligatorio");
-                return;
-            }
-
-            fetch('/api/clientes', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ nombre: nombre, direccion: direccion })
-            })
-            .then(res => res.json())
-            .then(data => {
-                alert(data.mensaje);
-                window.location.href = '/'; // Recargamos para que aparezca en la lista
-            });
-        }
-    </script>
 </body>
 </html>

@@ -3,45 +3,53 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Iniciar Sesión - GNB Mantenimiento</title>
+    <title>Acceso - GNB Mantenimiento</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body {
-            background-color: #f0f2f5;
+            background-color: #eef2f7;
             display: flex;
             align-items: center;
             justify-content: center;
             height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
         .login-card {
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-            border-radius: 10px;
             background: white;
-            padding: 2rem;
+            padding: 2.5rem;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
             width: 100%;
             max-width: 400px;
         }
-        .login-header {
+        .brand-logo {
+            font-size: 3rem;
             text-align: center;
-            margin-bottom: 2rem;
+            margin-bottom: 1rem;
         }
-        .login-header h3 {
-            color: #0d6efd;
-            font-weight: bold;
+        .btn-guest {
+            background-color: #6c757d;
+            color: white;
+            border: none;
+        }
+        .btn-guest:hover {
+            background-color: #5a6268;
+            color: white;
         }
     </style>
 </head>
 <body>
 
     <div class="login-card">
-        <div class="login-header">
-            <h3>🔐 GNB Acceso</h3>
-            <p class="text-muted">Sistema de Mantenimiento</p>
+        <div class="text-center mb-4">
+            <div class="brand-logo">🛠️</div>
+            <h3 class="fw-bold text-dark">GNB System</h3>
+            <p class="text-muted">Gestión de Activos y Mantenimiento</p>
         </div>
 
         {% with messages = get_flashed_messages() %}
             {% if messages %}
-                <div class="alert alert-danger" role="alert">
+                <div class="alert alert-danger text-center py-2" role="alert">
                     {{ messages[0] }}
                 </div>
             {% endif %}
@@ -49,18 +57,9 @@
 
         <form action="/login" method="POST">
             <div class="mb-3">
-                <label for="username" class="form-label">Usuario</label>
-                <input type="text" class="form-control" id="username" name="username" required autofocus>
+                <label class="form-label fw-bold">Usuario</label>
+                <input type="text" name="username" class="form-control form-control-lg" placeholder="Ej: admin" required autofocus>
             </div>
-            <div class="mb-3">
-                <label for="password" class="form-label">Contraseña</label>
-                <input type="password" class="form-control" id="password" name="password" required>
-            </div>
-            <div class="d-grid gap-2">
-                <button type="submit" class="btn btn-primary">Ingresar</button>
-            </div>
-        </form>
-    </div>
-
-</body>
-</html>
+            <div class="mb-4">
+                <label class="form-label fw-bold">Contraseña</label>
+                <input type="password
