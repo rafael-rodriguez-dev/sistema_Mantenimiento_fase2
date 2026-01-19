@@ -11,18 +11,19 @@ import qrcode
 import io
 
 app = Flask(__name__)
-app.secret_key = 'super_secreto_clave_segura' # Necesario para sesiones
+# ¡IMPORTANTE! Esta clave secreta es necesaria para que funcionen las sesiones
+app.secret_key = 'super_secreto_clave_segura_gnb'
 
 # --- CONFIGURACIÓN DE BASE DE DATOS INTELIGENTE ---
 database_url = os.environ.get('DATABASE_URL')
 
 if database_url:
-    # NUBE (Render) ☁️
+    # NUBE (Render)
     if database_url.startswith("postgres://"):
         database_url = database_url.replace("postgres://", "postgresql://", 1)
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 else:
-    # LOCAL (PC) 💻
+    # LOCAL (PC)
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///mantenimiento_v2.db'
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -32,13 +33,13 @@ db = SQLAlchemy(app)
 # --- CONFIGURACIÓN LOGIN ---
 login_manager = LoginManager()
 login_manager.init_app(app)
-login_manager.login_view = 'login' # Si no estás logueado, te manda aquí
+login_manager.login_view = 'login' # Si intentas entrar sin permiso, te manda aquí
 
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# --- MODELOS (TABLAS) ---
+# --- MODELOS ---
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(100), unique=True, nullable=False)
@@ -66,43 +67,67 @@ class Equipo(db.Model):
     observaciones = db.Column(db.String(300), nullable=True)
     cliente_id = db.Column(db.Integer, db.ForeignKey('cliente.id'), nullable=False)
 
-# --- RUTA DE INSTALACIÓN (SETUP MEJORADO) ---
+# --- RUTAS DE AUTENTICACIÓN (NUEVO) ---
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
+    
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        
+        user = User.query.filter_by(username=username).first()
+        
+        # Verificamos si el usuario existe y la contraseña coincide
+        if user and user.check_password(password):
+            login_user(user)
+            return redirect(url_for('dashboard'))
+        else:
+            flash('Usuario o contraseña incorrectos')
+            
+    return render_template('login.html')
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('login'))
+
+# --- RUTA DE SETUP ---
 @app.route('/setup-fase2')
 def setup_db():
     try:
         with app.app_context():
-            db.create_all() # Crea tablas (incluyendo User)
-            
-            # 1. Crear Usuario Admin si no existe
+            db.create_all()
+            # Crear Admin si no existe
             if not User.query.filter_by(username='admin').first():
                 admin = User(username='admin')
-                admin.set_password('admin123') # <--- CONTRASEÑA POR DEFECTO
+                admin.set_password('admin123')
                 db.session.add(admin)
-                mensaje_user = "👤 Usuario 'admin' creado (Clave: admin123)."
+                mensaje = "👤 Admin creado."
             else:
-                mensaje_user = "👤 El usuario 'admin' ya existe."
-
-            # 2. Crear Clientes Base
+                mensaje = "👤 Admin ya existe."
+            
+            # Crear Clientes si no existen
             if not Cliente.query.first():
                 c1 = Cliente(nombre="GNB Sudameris - Torre A", direccion="Calle 72")
                 c2 = Cliente(nombre="Edificio Avianca", direccion="Calle 26")
                 db.session.add(c1)
                 db.session.add(c2)
-                mensaje_cli = "🏢 Clientes base creados."
-            else:
-                mensaje_cli = "🏢 Clientes ya existían."
             
             db.session.commit()
-            return f"✅ SETUP COMPLETO:<br>{mensaje_user}<br>{mensaje_cli}"
+            return f"✅ Setup Finalizado: {mensaje}"
     except Exception as e:
         return f"❌ Error: {str(e)}"
 
-# --- RUTAS PRINCIPALES ---
+# --- RUTAS PRINCIPALES (PROTEGIDAS) ---
 @app.route('/')
-# @login_required  <--- AÚN NO ACTIVAMOS ESTO PARA NO BLOQUEARTE
+@login_required  # <--- ¡ESTE ES EL CANDADO! 🔒
 def dashboard():
     cliente_id_filtrado = request.args.get('cliente_id')
     todos_los_clientes = Cliente.query.all()
+    
     cliente_actual = None
     if cliente_id_filtrado:
         equipos_mostrar = Equipo.query.filter_by(cliente_id=cliente_id_filtrado).all()
@@ -113,9 +138,10 @@ def dashboard():
     return render_template('index.html', 
                            equipos=equipos_mostrar, 
                            clientes=todos_los_clientes,
-                           cliente_actual=cliente_actual)
+                           cliente_actual=cliente_actual,
+                           user=current_user) # Pasamos el usuario al HTML
 
-# --- API (JSON) ---
+# --- API (También deberíamos protegerla, pero por ahora la dejamos abierta para facilitar pruebas) ---
 @app.route('/api/clientes', methods=['GET'])
 def obtener_clientes():
     clientes = Cliente.query.all()
@@ -181,9 +207,10 @@ def eliminar_equipo(id):
         return jsonify({"mensaje": "Equipo eliminado"})
     return jsonify({"mensaje": "No encontrado"}), 404
 
-# --- EXPORTAR PDF ---
 @app.route('/exportar-pdf')
+@login_required # Protegemos el reporte también
 def exportar_pdf():
+    # ... (El código del PDF sigue igual, solo agregué @login_required arriba)
     cliente_id = request.args.get('cliente_id')
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=letter)
