@@ -11,21 +11,11 @@
         .sidebar a { color: #bdc3c7; text-decoration: none; display: block; padding: 10px 15px; }
         .sidebar a:hover, .sidebar a.active { background-color: #34495e; color: white; border-left: 4px solid #3498db; }
         .status-badge { font-size: 0.85em; }
-        /* Estilo para el buscador */
-        .search-box {
-            position: relative;
-        }
-        .search-box i {
-            position: absolute;
-            left: 15px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #aaa;
-        }
-        .search-box input {
-            padding-left: 40px; /* Espacio para el icono */
-            border-radius: 20px;
-        }
+        .search-box { position: relative; }
+        .search-box i { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: #aaa; }
+        .search-box input { padding-left: 40px; border-radius: 20px; }
+        /* Ajuste para el gráfico */
+        .chart-container { position: relative; height: 100px; width: 100px; margin: 0 auto; }
     </style>
 </head>
 <body>
@@ -90,11 +80,31 @@
             </div>
 
             <div class="row mb-4 align-items-center">
+                
                 <div class="col-md-3">
                     <div class="card border-0 shadow-sm">
-                        <div class="card-body">
-                            <h6 class="text-muted">Total Equipos</h6>
-                            <h3 id="contadorEquipos">{{ equipos|length }}</h3>
+                        <div class="card-body d-flex align-items-center justify-content-between">
+                            <div>
+                                <h6 class="text-muted mb-0">Total Equipos</h6>
+                                <h3 class="mb-0" id="contadorEquipos">{{ equipos|length }}</h3>
+                            </div>
+                            <div class="fs-1 text-primary opacity-25">
+                                <i class="fas fa-server"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-3">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-body py-2 d-flex align-items-center">
+                            <div class="chart-container">
+                                <canvas id="graficoEstado"></canvas>
+                            </div>
+                            <div class="ms-3">
+                                <small class="text-success d-block fw-bold">● Operativo</small>
+                                <small class="text-danger d-block fw-bold">● Falla</small>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -109,7 +119,8 @@
 
             <div class="card shadow-sm">
                 <div class="card-body p-0">
-                    <table class="table table-hover mb-0" id="tablaEquipos"> <thead class="table-light">
+                    <table class="table table-hover mb-0" id="tablaEquipos">
+                        <thead class="table-light">
                             <tr>
                                 <th>Estado</th>
                                 <th>Nombre</th>
@@ -124,7 +135,8 @@
                         </thead>
                         <tbody>
                             {% for equipo in equipos %}
-                            <tr class="fila-equipo"> <td>
+                            <tr class="fila-equipo">
+                                <td>
                                     {% if equipo.estado == 'Operativo' %}
                                         <span class="badge bg-success status-badge">OK</span>
                                     {% else %}
@@ -156,13 +168,11 @@
                                 </td>
                             </tr>
                             {% endfor %}
-                            
                             <tr id="sinResultados" style="display: none;">
                                 <td colspan="7" class="text-center py-4 text-muted">
-                                    🔍 No se encontraron equipos con ese criterio.
+                                    🔍 No se encontraron equipos.
                                 </td>
                             </tr>
-
                         </tbody>
                     </table>
                 </div>
@@ -253,47 +263,65 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-    // --- LÓGICA DEL BUSCADOR (NUEVO) ---
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script> <script>
+    // --- 1. LÓGICA DEL GRÁFICO (Chart.js) ---
+    // Usamos Jinja para pasar los estados a una lista JS
+    const estados = {{ equipos | map(attribute='estado') | list | tojson }};
+    
+    // Contamos cuántos de cada uno
+    const conteoOperativo = estados.filter(e => e === 'Operativo').length;
+    const conteoFalla = estados.filter(e => e === 'Falla').length;
+
+    // Dibujamos el gráfico
+    const ctx = document.getElementById('graficoEstado').getContext('2d');
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Operativo', 'Falla'],
+            datasets: [{
+                data: [conteoOperativo, conteoFalla],
+                backgroundColor: ['#198754', '#dc3545'], // Verde y Rojo Bootstrap
+                borderWidth: 0,
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false } // Ocultamos leyenda interna para usar la nuestra personalizada
+            },
+            cutout: '70%' // Hace la dona más delgada y elegante
+        }
+    });
+
+    // --- 2. LÓGICA DEL BUSCADOR ---
     document.getElementById('inputBuscador').addEventListener('keyup', function() {
         let texto = this.value.toLowerCase();
         let filas = document.querySelectorAll('.fila-equipo');
         let hayResultados = false;
-
         filas.forEach(fila => {
-            // Buscamos en todo el texto de la fila (Nombre, Serial, Tipo, etc.)
             let contenido = fila.innerText.toLowerCase();
-            
             if (contenido.includes(texto)) {
-                fila.style.display = ''; // Mostrar
+                fila.style.display = '';
                 hayResultados = true;
             } else {
-                fila.style.display = 'none'; // Ocultar
+                fila.style.display = 'none';
             }
         });
-
-        // Mostrar mensaje si no hay nada
         document.getElementById('sinResultados').style.display = hayResultados ? 'none' : '';
     });
-    // -----------------------------------
 
+    // --- 3. LÓGICA DE FORMULARIOS (Igual que antes) ---
     document.getElementById('formCliente').onsubmit = async (e) => {
         e.preventDefault();
-        const data = {
-            nombre: e.target.nombre.value,
-            direccion: e.target.direccion.value
-        };
-        const res = await fetch('/api/clientes', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(data)
-        });
+        const data = { nombre: e.target.nombre.value, direccion: e.target.direccion.value };
+        const res = await fetch('/api/clientes', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
         if(res.ok) window.location.reload();
         else alert("Error al crear cliente");
     };
 
     const modalEquipo = new bootstrap.Modal(document.getElementById('modalEquipo'));
-    
     document.getElementById('modalEquipo').addEventListener('show.bs.modal', function (event) {
         if (!event.relatedTarget.onclick) { 
             document.getElementById('formEquipo').reset();
@@ -316,20 +344,14 @@
         };
         const metodo = id ? 'PUT' : 'POST';
         const url = id ? `/api/equipos/${id}` : '/api/equipos';
-        const res = await fetch(url, {
-            method: metodo,
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(data)
-        });
-        const result = await res.json();
+        const res = await fetch(url, { method: metodo, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
         if(res.ok) window.location.reload();
-        else alert(result.mensaje || "Error");
+        else alert("Error al guardar");
     };
 
     window.abrirEditar = (equipo) => {
         document.getElementById('equipoId').value = equipo.id;
         document.getElementById('tituloModalEquipo').innerText = 'Editar Equipo';
-        
         const form = document.getElementById('formEquipo');
         form.nombre.value = equipo.nombre;
         form.tipo.value = equipo.tipo;
@@ -338,7 +360,6 @@
         form.estado.value = equipo.estado;
         form.observaciones.value = equipo.observaciones || '';
         document.getElementById('selectCliente').value = equipo.cliente_id;
-
         modalEquipo.show();
     };
 
@@ -346,7 +367,7 @@
         if(!confirm('¿Seguro?')) return;
         const res = await fetch(`/api/equipos/${id}`, { method: 'DELETE' });
         if(res.ok) window.location.reload();
-        else alert("No se pudo eliminar");
+        else alert("Error al eliminar");
     };
 </script>
 
