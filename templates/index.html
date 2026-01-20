@@ -11,6 +11,21 @@
         .sidebar a { color: #bdc3c7; text-decoration: none; display: block; padding: 10px 15px; }
         .sidebar a:hover, .sidebar a.active { background-color: #34495e; color: white; border-left: 4px solid #3498db; }
         .status-badge { font-size: 0.85em; }
+        /* Estilo para el buscador */
+        .search-box {
+            position: relative;
+        }
+        .search-box i {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #aaa;
+        }
+        .search-box input {
+            padding-left: 40px; /* Espacio para el icono */
+            border-radius: 20px;
+        }
     </style>
 </head>
 <body>
@@ -74,21 +89,27 @@
                 </div>
             </div>
 
-            <div class="row mb-4">
+            <div class="row mb-4 align-items-center">
                 <div class="col-md-3">
                     <div class="card border-0 shadow-sm">
                         <div class="card-body">
                             <h6 class="text-muted">Total Equipos</h6>
-                            <h3>{{ equipos|length }}</h3>
+                            <h3 id="contadorEquipos">{{ equipos|length }}</h3>
                         </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6 ms-auto">
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="inputBuscador" class="form-control" placeholder="Buscar por serial, nombre, tipo...">
                     </div>
                 </div>
             </div>
 
             <div class="card shadow-sm">
                 <div class="card-body p-0">
-                    <table class="table table-hover mb-0">
-                        <thead class="table-light">
+                    <table class="table table-hover mb-0" id="tablaEquipos"> <thead class="table-light">
                             <tr>
                                 <th>Estado</th>
                                 <th>Nombre</th>
@@ -103,8 +124,7 @@
                         </thead>
                         <tbody>
                             {% for equipo in equipos %}
-                            <tr>
-                                <td>
+                            <tr class="fila-equipo"> <td>
                                     {% if equipo.estado == 'Operativo' %}
                                         <span class="badge bg-success status-badge">OK</span>
                                     {% else %}
@@ -136,6 +156,13 @@
                                 </td>
                             </tr>
                             {% endfor %}
+                            
+                            <tr id="sinResultados" style="display: none;">
+                                <td colspan="7" class="text-center py-4 text-muted">
+                                    🔍 No se encontraron equipos con ese criterio.
+                                </td>
+                            </tr>
+
                         </tbody>
                     </table>
                 </div>
@@ -227,6 +254,29 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+    // --- LÓGICA DEL BUSCADOR (NUEVO) ---
+    document.getElementById('inputBuscador').addEventListener('keyup', function() {
+        let texto = this.value.toLowerCase();
+        let filas = document.querySelectorAll('.fila-equipo');
+        let hayResultados = false;
+
+        filas.forEach(fila => {
+            // Buscamos en todo el texto de la fila (Nombre, Serial, Tipo, etc.)
+            let contenido = fila.innerText.toLowerCase();
+            
+            if (contenido.includes(texto)) {
+                fila.style.display = ''; // Mostrar
+                hayResultados = true;
+            } else {
+                fila.style.display = 'none'; // Ocultar
+            }
+        });
+
+        // Mostrar mensaje si no hay nada
+        document.getElementById('sinResultados').style.display = hayResultados ? 'none' : '';
+    });
+    // -----------------------------------
+
     document.getElementById('formCliente').onsubmit = async (e) => {
         e.preventDefault();
         const data = {
