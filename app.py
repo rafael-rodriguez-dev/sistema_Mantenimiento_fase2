@@ -288,25 +288,25 @@ def exportar_pdf():
     return send_file(buffer, as_attachment=True, download_name="reporte.pdf", mimetype='application/pdf')
 
 # --- RUTA DE EMERGENCIA PARA RENDER (SOLO USAR UNA VEZ) ---
-@app.route('/reset-db-nuclear')
-def reset_nuclear():
-    try:
-        # ¡CUIDADO! Esto borra TODA la base de datos
-        db.drop_all()
-        db.create_all()
+# @app.route('/reset-db-nuclear')
+# def reset_nuclear():
+#     try:
+#         # ¡CUIDADO! Esto borra TODA la base de datos
+#         db.drop_all()
+#         db.create_all()
         
-        # Volvemos a crear al Admin y al Invitado
-        admin = User(username='admin'); admin.set_password('admin123'); db.session.add(admin)
-        guest = User(username='invitado'); guest.set_password('invitado'); db.session.add(guest)
+#         # Volvemos a crear al Admin y al Invitado
+#         admin = User(username='admin'); admin.set_password('admin123'); db.session.add(admin)
+#         guest = User(username='invitado'); guest.set_password('invitado'); db.session.add(guest)
         
-        # Creamos un cliente de prueba
-        c1 = Cliente(nombre="Cliente Reiniciado", direccion="Base de Datos Nueva")
-        db.session.add(c1)
+#         # Creamos un cliente de prueba
+#         c1 = Cliente(nombre="Cliente Reiniciado", direccion="Base de Datos Nueva")
+#         db.session.add(c1)
         
-        db.session.commit()
-        return "☢️ BASE DE DATOS RESETEADA: Ahora ya soporta FOTOS."
-    except Exception as e:
-        return f"Error: {str(e)}"
+#         db.session.commit()
+#         return "☢️ BASE DE DATOS RESETEADA: Ahora ya soporta FOTOS."
+#     except Exception as e:
+#         return f"Error: {str(e)}"
 
 if __name__ == '__main__':
     with app.app_context(): db.create_all()
