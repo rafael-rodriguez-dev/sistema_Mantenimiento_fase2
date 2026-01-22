@@ -10,25 +10,21 @@ from reportlab.lib import colors
 from reportlab.lib.utils import ImageReader
 import qrcode
 import io
+import base64 # Importamos base64 para manejar imágenes si es necesario decodificar
 
 app = Flask(__name__)
-# Clave secreta para sesiones
 app.secret_key = 'super_secreto_clave_segura_gnb'
 
-# --- CONFIGURACIÓN DE BASE DE DATOS ---
+# --- CONFIGURACIÓN BD ---
 database_url = os.environ.get('DATABASE_URL')
-
 if database_url:
-    # NUBE (Render) - Corrección automática
     if database_url.startswith("postgres://"):
         database_url = database_url.replace("postgres://", "postgresql://", 1)
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 else:
-    # LOCAL (PC)
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///mantenimiento_v2.db'
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
 db = SQLAlchemy(app)
 
 # --- LOGIN ---
@@ -40,8 +36,7 @@ login_manager.login_view = 'login'
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# --- MODELOS DE BASE DE DATOS ---
-
+# --- MODELOS ---
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(100), unique=True, nullable=False)
@@ -49,7 +44,6 @@ class User(UserMixin, db.Model):
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
-
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
 
@@ -67,9 +61,9 @@ class Equipo(db.Model):
     ubicacion = db.Column(db.String(100), nullable=False)
     estado = db.Column(db.String(20), default="Operativo")
     observaciones = db.Column(db.String(300), nullable=True)
+    # NUEVA COLUMNA FOTO (Text para soportar Base64 largo)
+    foto = db.Column(db.Text, nullable=True) 
     cliente_id = db.Column(db.Integer, db.ForeignKey('cliente.id'), nullable=False)
-    
-    # Relación con mantenimientos (si borras equipo, se borra su historial)
     mantenimientos = db.relationship('Mantenimiento', backref='equipo_rel', lazy=True, cascade="all, delete-orphan")
 
     def to_dict(self):
@@ -81,44 +75,37 @@ class Equipo(db.Model):
             'ubicacion': self.ubicacion,
             'estado': self.estado,
             'observaciones': self.observaciones,
+            'foto': self.foto, # Enviamos la foto al frontend
             'cliente_id': self.cliente_id
         }
 
-# --- NUEVA TABLA: HISTORIAL DE MANTENIMIENTO ---
 class Mantenimiento(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    fecha = db.Column(db.DateTime, default=datetime.utcnow) # Fecha automática
-    descripcion = db.Column(db.String(500), nullable=False) # Qué se hizo
-    usuario = db.Column(db.String(100), nullable=False)     # Quién lo hizo (Auditoría)
+    fecha = db.Column(db.DateTime, default=datetime.utcnow)
+    descripcion = db.Column(db.String(500), nullable=False)
+    usuario = db.Column(db.String(100), nullable=False)
     equipo_id = db.Column(db.Integer, db.ForeignKey('equipo.id'), nullable=False)
 
     def to_dict(self):
         return {
             'id': self.id,
-            'fecha': self.fecha.strftime('%Y-%m-%d %H:%M'), # Formato legible
+            'fecha': self.fecha.strftime('%Y-%m-%d %H:%M'),
             'descripcion': self.descripcion,
             'usuario': self.usuario,
             'equipo_id': self.equipo_id
         }
 
-# --- RUTAS DE NAVEGACIÓN ---
-
+# --- RUTAS VISTAS ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    if current_user.is_authenticated:
-        return redirect(url_for('dashboard'))
-    
+    if current_user.is_authenticated: return redirect(url_for('dashboard'))
     if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        user = User.query.filter_by(username=username).first()
-        
-        if user and user.check_password(password):
+        user = User.query.filter_by(username=request.form['username']).first()
+        if user and user.check_password(request.form['password']):
             login_user(user)
             return redirect(url_for('dashboard'))
         else:
             flash('Usuario o contraseña incorrectos')
-            
     return render_template('login.html')
 
 @app.route('/login-invitado')
@@ -127,9 +114,8 @@ def login_invitado():
     if user:
         login_user(user)
         return redirect(url_for('dashboard'))
-    else:
-        flash("Error: Ejecuta /setup-fase2 primero")
-        return redirect(url_for('login'))
+    flash("Error: Ejecuta /setup-fase2 primero")
+    return redirect(url_for('login'))
 
 @app.route('/logout')
 @login_required
@@ -137,82 +123,79 @@ def logout():
     logout_user()
     return redirect(url_for('login'))
 
+@app.route('/')
+@login_required
+def dashboard():
+    cliente_id = request.args.get('cliente_id')
+    clientes = Cliente.query.all()
+    equipos = Equipo.query.filter_by(cliente_id=cliente_id).all() if cliente_id else Equipo.query.all()
+    cliente_actual = Cliente.query.get(cliente_id) if cliente_id else None
+    return render_template('index.html', equipos=equipos, clientes=clientes, cliente_actual=cliente_actual, user=current_user)
+
+# --- SETUP (Reinicia DB si es necesario) ---
 @app.route('/setup-fase2')
 def setup_db():
     try:
         with app.app_context():
-            db.create_all() # ¡ESTO CREARÁ LA NUEVA TABLA DE MANTENIMIENTO!
-            
-            # Crear usuarios base
+            db.create_all()
+            # Crear usuarios y clientes base si no existen
             if not User.query.filter_by(username='admin').first():
-                admin = User(username='admin')
-                admin.set_password('admin123')
-                db.session.add(admin)
-            
+                admin = User(username='admin'); admin.set_password('admin123'); db.session.add(admin)
             if not User.query.filter_by(username='invitado').first():
-                guest = User(username='invitado')
-                guest.set_password('invitado')
-                db.session.add(guest)
-
-            # Crear clientes base
+                guest = User(username='invitado'); guest.set_password('invitado'); db.session.add(guest)
             if not Cliente.query.first():
-                c1 = Cliente(nombre="GNB Sudameris - Torre A", direccion="Calle 72")
-                c2 = Cliente(nombre="Edificio Avianca", direccion="Calle 26")
-                db.session.add(c1)
-                db.session.add(c2)
-            
+                db.session.add(Cliente(nombre="Cliente Demo 1", direccion="Sede Principal"))
             db.session.commit()
-            return "✅ SETUP COMPLETO. Tabla de Mantenimiento creada."
+            return "✅ SETUP COMPLETO (Estructura de Imágenes lista)."
     except Exception as e:
         return f"❌ Error: {str(e)}"
 
-@app.route('/')
+# --- API ---
+@app.route('/api/usuarios', methods=['GET'])
 @login_required
-def dashboard():
-    cliente_id_filtrado = request.args.get('cliente_id')
-    todos_los_clientes = Cliente.query.all()
-    
-    cliente_actual = None
-    if cliente_id_filtrado:
-        equipos_mostrar = Equipo.query.filter_by(cliente_id=cliente_id_filtrado).all()
-        cliente_actual = Cliente.query.get(cliente_id_filtrado)
-    else:
-        equipos_mostrar = Equipo.query.all()
+def obtener_usuarios():
+    if current_user.username == 'invitado': return jsonify({"mensaje": "Denegado"}), 403
+    return jsonify([{"id": u.id, "username": u.username} for u in User.query.all()])
 
-    return render_template('index.html', 
-                           equipos=equipos_mostrar, 
-                           clientes=todos_los_clientes,
-                           cliente_actual=cliente_actual,
-                           user=current_user)
-
-# --- API (CRUD) ---
-
-@app.route('/api/clientes', methods=['GET'])
+@app.route('/api/usuarios', methods=['POST'])
 @login_required
-def obtener_clientes():
-    clientes = Cliente.query.all()
-    lista = [{"id": c.id, "nombre": c.nombre} for c in clientes]
-    return jsonify(lista)
+def crear_usuario():
+    if current_user.username == 'invitado': return jsonify({"mensaje": "Denegado"}), 403
+    data = request.json
+    if User.query.filter_by(username=data['username']).first(): return jsonify({"mensaje": "Existe"}), 400
+    nuevo = User(username=data['username'])
+    nuevo.set_password(data['password'])
+    db.session.add(nuevo)
+    db.session.commit()
+    return jsonify({"mensaje": "Creado"})
+
+@app.route('/api/usuarios/<int:id>', methods=['DELETE'])
+@login_required
+def eliminar_usuario(id):
+    if current_user.username == 'invitado': return jsonify({"mensaje": "Denegado"}), 403
+    if current_user.id == id: return jsonify({"mensaje": "No puedes borrarte a ti mismo"}), 400
+    user = User.query.get(id)
+    if user and user.username not in ['admin', 'invitado']:
+        db.session.delete(user)
+        db.session.commit()
+        return jsonify({"mensaje": "Eliminado"})
+    return jsonify({"mensaje": "No permitido"}), 400
 
 @app.route('/api/clientes', methods=['POST'])
 @login_required
 def crear_cliente():
-    if current_user.username == 'invitado':
-        return jsonify({"mensaje": "⚠️ Modo Invitado: Solo lectura"}), 403
-    datos = request.json
-    try:
-        nuevo = Cliente(nombre=datos['nombre'], direccion=datos.get('direccion', ''))
-        db.session.add(nuevo)
-        db.session.commit()
-        return jsonify({"mensaje": "Cliente creado"})
-    except Exception as e:
-        return jsonify({"mensaje": str(e)}), 400
+    if current_user.username == 'invitado': return jsonify({"mensaje": "Denegado"}), 403
+    db.session.add(Cliente(nombre=request.json['nombre'], direccion=request.json.get('direccion','')))
+    db.session.commit()
+    return jsonify({"mensaje": "Ok"})
+
+# --- API EQUIPOS (ACTUALIZADA CON FOTOS) ---
+# --- EN app.py ---
 
 @app.route('/api/equipos', methods=['POST'])
 @login_required
 def agregar_equipo():
-    if current_user.username == 'invitado':
-        return jsonify({"mensaje": "⚠️ Modo Invitado: Solo lectura"}), 403
+    if current_user.username == 'invitado': return jsonify({"mensaje": "Solo lectura"}), 403
     data = request.json
     try:
         nuevo = Equipo(
@@ -221,191 +204,110 @@ def agregar_equipo():
             tipo=data['tipo'], 
             serial=data['serial'], 
             ubicacion=data['ubicacion'],
-            observaciones=data.get('observaciones', '')
+            # AQUI ESTABA EL ERROR: Faltaba leer el estado
+            estado=data.get('estado', 'Operativo'), # <--- LINEA AGREGADA
+            observaciones=data.get('observaciones', ''),
+            foto=data.get('foto', '') 
         )
         db.session.add(nuevo)
         db.session.commit()
         return jsonify({"mensaje": "Equipo registrado"})
     except Exception as e:
-        return jsonify({"mensaje": "Error: Serial repetido"}), 400
+        return jsonify({"mensaje": "Error: Serial duplicado o datos inválidos"}), 400
 
 @app.route('/api/equipos/<int:id>', methods=['PUT'])
 @login_required
 def editar_equipo(id):
-    if current_user.username == 'invitado':
-        return jsonify({"mensaje": "⚠️ Modo Invitado: Solo lectura"}), 403
+    if current_user.username == 'invitado': return jsonify({"mensaje": "Solo lectura"}), 403
     data = request.json
     equipo = Equipo.query.get(id)
     if not equipo: return jsonify({"mensaje": "No encontrado"}), 404
-    try:
-        equipo.nombre = data['nombre']
-        equipo.tipo = data['tipo']
-        equipo.serial = data['serial']
-        equipo.ubicacion = data['ubicacion']
-        equipo.estado = data.get('estado', equipo.estado)
-        equipo.observaciones = data.get('observaciones', '')
-        equipo.cliente_id = data['cliente_id']
-        db.session.commit()
-        return jsonify({"mensaje": "Equipo actualizado"})
-    except Exception:
-        return jsonify({"mensaje": "Error al actualizar"}), 400
+    
+    equipo.nombre = data['nombre']
+    equipo.tipo = data['tipo']
+    equipo.serial = data['serial']
+    equipo.ubicacion = data['ubicacion']
+    equipo.estado = data.get('estado', equipo.estado)
+    equipo.observaciones = data.get('observaciones', '')
+    equipo.cliente_id = data['cliente_id']
+    
+    # Solo actualizamos la foto si enviaron una nueva (si viene vacía, conservamos la anterior)
+    if data.get('foto'):
+        equipo.foto = data['foto']
+
+    db.session.commit()
+    return jsonify({"mensaje": "Actualizado"})
 
 @app.route('/api/equipos/<int:id>', methods=['DELETE'])
 @login_required
 def eliminar_equipo(id):
-    if current_user.username == 'invitado':
-        return jsonify({"mensaje": "⚠️ Modo Invitado: Solo lectura"}), 403
-    equipo = Equipo.query.get(id)
-    if equipo:
-        db.session.delete(equipo)
-        db.session.commit()
-        return jsonify({"mensaje": "Eliminado"})
+    if current_user.username == 'invitado': return jsonify({"mensaje": "Solo lectura"}), 403
+    eq = Equipo.query.get(id)
+    if eq: db.session.delete(eq); db.session.commit(); return jsonify({"mensaje": "Eliminado"})
     return jsonify({"mensaje": "No encontrado"}), 404
-
-# --- API NUEVA: HISTORIAL DE MANTENIMIENTO ---
 
 @app.route('/api/mantenimientos', methods=['POST'])
 @login_required
-def agregar_mantenimiento():
-    if current_user.username == 'invitado':
-        return jsonify({"mensaje": "⚠️ Modo Invitado: Solo lectura"}), 403
+def agregar_mant():
+    if current_user.username == 'invitado': return jsonify({"mensaje": "Denegado"}), 403
+    db.session.add(Mantenimiento(descripcion=request.json['descripcion'], usuario=current_user.username, equipo_id=request.json['equipo_id']))
+    db.session.commit()
+    return jsonify({"mensaje": "Ok"})
 
-    data = request.json
-    try:
-        nuevo_mant = Mantenimiento(
-            descripcion=data['descripcion'],
-            usuario=current_user.username, # <--- ¡AQUÍ GUARDAMOS QUIÉN FUE!
-            equipo_id=data['equipo_id']
-        )
-        db.session.add(nuevo_mant)
-        db.session.commit()
-        return jsonify({"mensaje": "Mantenimiento registrado"})
-    except Exception as e:
-        return jsonify({"mensaje": f"Error: {str(e)}"}), 400
-
-@app.route('/api/mantenimientos/<int:equipo_id>', methods=['GET'])
+@app.route('/api/mantenimientos/<int:id>', methods=['GET'])
 @login_required
-def ver_historial(equipo_id):
-    # Trae el historial ordenado del más nuevo al más viejo
-    historial = Mantenimiento.query.filter_by(equipo_id=equipo_id).order_by(Mantenimiento.fecha.desc()).all()
-    return jsonify([h.to_dict() for h in historial])
-# --- API DE GESTIÓN DE USUARIOS (NUEVO) ---
+def ver_mant(id):
+    return jsonify([m.to_dict() for m in Mantenimiento.query.filter_by(equipo_id=id).order_by(Mantenimiento.fecha.desc()).all()])
 
-@app.route('/api/usuarios', methods=['GET'])
-@login_required
-def obtener_usuarios():
-    # Solo el admin real puede ver usuarios (Opcional: o todos menos invitado)
-    if current_user.username == 'invitado':
-        return jsonify({"mensaje": "Acceso denegado"}), 403
-        
-    usuarios = User.query.all()
-    # Devolvemos la lista, PERO NUNCA devolvemos la contraseña hash (por seguridad)
-    lista = [{"id": u.id, "username": u.username} for u in usuarios]
-    return jsonify(lista)
-
-@app.route('/api/usuarios', methods=['POST'])
-@login_required
-def crear_usuario():
-    if current_user.username == 'invitado':
-        return jsonify({"mensaje": "Modo Invitado: No puedes crear usuarios"}), 403
-
-    datos = request.json
-    username_nuevo = datos.get('username')
-    password_nuevo = datos.get('password')
-
-    if not username_nuevo or not password_nuevo:
-        return jsonify({"mensaje": "Faltan datos"}), 400
-
-    # Validar que no exista ya
-    if User.query.filter_by(username=username_nuevo).first():
-        return jsonify({"mensaje": "El usuario ya existe"}), 400
-
-    try:
-        nuevo_user = User(username=username_nuevo)
-        nuevo_user.set_password(password_nuevo) # ¡Aquí se encripta automáticamente! 🔒
-        db.session.add(nuevo_user)
-        db.session.commit()
-        return jsonify({"mensaje": "Usuario creado exitosamente"})
-    except Exception as e:
-        return jsonify({"mensaje": f"Error: {str(e)}"}), 400
-
-@app.route('/api/usuarios/<int:user_id>', methods=['DELETE'])
-@login_required
-def eliminar_usuario(user_id):
-    if current_user.username == 'invitado':
-        return jsonify({"mensaje": "Modo Invitado: No puedes eliminar"}), 403
-
-    # SEGURO ANTI-SUICIDIO: No permitir que el admin se borre a sí mismo
-    if current_user.id == user_id:
-        return jsonify({"mensaje": "❌ No puedes eliminar tu propio usuario mientras estás conectado."}), 400
-
-    user_a_borrar = User.query.get(user_id)
-    if user_a_borrar:
-        # Proteger al usuario 'admin' original y al 'invitado' para no romper el sistema
-        if user_a_borrar.username in ['admin', 'invitado']:
-             return jsonify({"mensaje": "⚠️ No se pueden eliminar los usuarios del sistema (admin/invitado)."}), 400
-             
-        db.session.delete(user_a_borrar)
-        db.session.commit()
-        return jsonify({"mensaje": "Usuario eliminado"})
-    
-    return jsonify({"mensaje": "Usuario no encontrado"}), 404
-# --- PDF ---
+# --- PDF (Actualizado para mostrar si tiene foto) ---
 @app.route('/exportar-pdf')
 @login_required
 def exportar_pdf():
     cliente_id = request.args.get('cliente_id')
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=letter)
-    c.setTitle("Reporte de Mantenimiento")
+    equipos = Cliente.query.get(cliente_id).equipos if cliente_id else Equipo.query.all()
     
-    titulo = "Reporte Global"
-    equipos = []
-    if cliente_id:
-        cli = Cliente.query.get(cliente_id)
-        if cli:
-            titulo = f"Cliente: {cli.nombre}"
-            equipos = cli.equipos
-    else:
-        equipos = Equipo.query.all()
-
     c.setFont("Helvetica-Bold", 16)
-    c.drawString(50, 750, titulo)
+    c.drawString(50, 750, "Reporte de Activos")
     y = 700
-    
     for eq in equipos:
-        if y < 100:
-            c.showPage()
-            y = 750
-        
-        # QR
+        if y < 100: c.showPage(); y = 750
         qr = qrcode.make(f"ID:{eq.id}-SN:{eq.serial}")
-        qr_mem = io.BytesIO()
-        qr.save(qr_mem, format="PNG")
-        qr_mem.seek(0)
+        qr_mem = io.BytesIO(); qr.save(qr_mem, format="PNG"); qr_mem.seek(0)
         c.drawImage(ImageReader(qr_mem), 50, y-10, 40, 40)
         
-        # Texto
         c.setFont("Helvetica-Bold", 12)
-        c.drawString(100, y+20, f"{eq.nombre} ({eq.estado})")
+        c.drawString(100, y+20, eq.nombre)
         c.setFont("Helvetica", 10)
-        c.drawString(100, y+5, f"{eq.tipo} | SN: {eq.serial} | {eq.ubicacion}")
-        
-        # Opcional: Mostrar último mantenimiento en PDF
-        if eq.mantenimientos:
-            ultimo = eq.mantenimientos[-1] # El último de la lista (o ordenarlo)
-            c.setFillColor(colors.gray)
-            c.setFont("Helvetica-Oblique", 9)
-            c.drawString(100, y-8, f"Último evento: {ultimo.descripcion} ({ultimo.fecha.strftime('%d/%m')}) por {ultimo.usuario}")
-            c.setFillColor(colors.black)
-
+        texto_extra = " (Con Foto)" if eq.foto else ""
+        c.drawString(100, y+5, f"{eq.tipo} | SN: {eq.serial} {texto_extra}")
         y -= 60
-        
     c.save()
     buffer.seek(0)
     return send_file(buffer, as_attachment=True, download_name="reporte.pdf", mimetype='application/pdf')
 
-if __name__ == '__main__':
-    with app.app_context():
+# --- RUTA DE EMERGENCIA PARA RENDER (SOLO USAR UNA VEZ) ---
+@app.route('/reset-db-nuclear')
+def reset_nuclear():
+    try:
+        # ¡CUIDADO! Esto borra TODA la base de datos
+        db.drop_all()
         db.create_all()
+        
+        # Volvemos a crear al Admin y al Invitado
+        admin = User(username='admin'); admin.set_password('admin123'); db.session.add(admin)
+        guest = User(username='invitado'); guest.set_password('invitado'); db.session.add(guest)
+        
+        # Creamos un cliente de prueba
+        c1 = Cliente(nombre="Cliente Reiniciado", direccion="Base de Datos Nueva")
+        db.session.add(c1)
+        
+        db.session.commit()
+        return "☢️ BASE DE DATOS RESETEADA: Ahora ya soporta FOTOS."
+    except Exception as e:
+        return f"Error: {str(e)}"
+
+if __name__ == '__main__':
+    with app.app_context(): db.create_all()
     app.run(debug=True)
