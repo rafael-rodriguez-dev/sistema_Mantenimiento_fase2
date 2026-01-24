@@ -3,9 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - RFL Mantenimiento</title>
+    <meta name="theme-color" content="#2c3e50">
+    <title>GNB Mantenimiento</title>
+    
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
     <style>
         .sidebar { min-height: 100vh; background-color: #2c3e50; color: white; }
         .sidebar a { color: #bdc3c7; text-decoration: none; display: block; padding: 10px 15px; }
@@ -18,25 +23,50 @@
         .historial-item { border-left: 3px solid #0d6efd; background-color: #f8f9fa; }
         .historial-meta { font-size: 0.85rem; color: #6c757d; }
         .user-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee; }
-        /* Estilo Miniatura Foto */
         .img-thumb { width: 40px; height: 40px; object-fit: cover; border-radius: 5px; cursor: pointer; border: 1px solid #ddd; }
-        .img-thumb:hover { transform: scale(1.1); transition: 0.2s; }
+        
+        /* --- ESTILOS DEL BOTÓN FLOTANTE (FAB) --- */
+        .fab-container {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            z-index: 1000;
+        }
+        .btn-fab {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background-color: #198754; /* Verde Éxito */
+            color: white;
+            border: none;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s;
+        }
+        .btn-fab:hover {
+            transform: scale(1.1);
+            background-color: #157347;
+            color: white;
+        }
+        /* Ocultar sidebar en móviles pequeños si quisieras, por ahora lo dejamos */
     </style>
 </head>
 <body>
 
 <div class="container-fluid">
     <div class="row">
-        <div class="col-md-2 sidebar p-0 d-flex flex-column">
-            <div class="p-3 text-center border-bottom border-secondary">
-                <h4>🛠️ RFL Mant.</h4>
-                <small class="text-muted">Hola, {{ user.username }} {% if user.username == 'invitado' %}(👀){% endif %}</small>
+        <div class="col-md-2 sidebar p-0 d-flex flex-column d-none d-md-flex"> <div class="p-3 text-center border-bottom border-secondary">
+                <h4>🛠️ GNB Mant.</h4>
+                <small class="text-muted">Hola, {{ user.username }}</small>
             </div>
             
             <div class="p-2">
                 <small class="text-uppercase text-muted ms-2">Clientes</small>
                 <a href="/" class="{{ 'active' if not cliente_actual else '' }}">
-                    <i class="fas fa-layer-group me-2"></i> Todos los Equipos
+                    <i class="fas fa-layer-group me-2"></i> Todos
                 </a>
                 {% for cliente in clientes %}
                 <a href="/?cliente_id={{ cliente.id }}" class="{{ 'active' if cliente_actual and cliente_actual.id == cliente.id else '' }}">
@@ -47,68 +77,67 @@
 
             {% if user.username != 'invitado' %}
             <div class="p-3 mt-2">
-                <button class="btn btn-primary w-100 btn-sm mb-2" data-bs-toggle="modal" data-bs-target="#modalCliente"><i class="fas fa-plus"></i> Nuevo Cliente</button>
+                <button class="btn btn-primary w-100 btn-sm mb-2" data-bs-toggle="modal" data-bs-target="#modalCliente"><i class="fas fa-plus"></i> Cliente</button>
                 <button class="btn btn-outline-light w-100 btn-sm" onclick="abrirUsuarios()"><i class="fas fa-users-cog"></i> Usuarios</button>
             </div>
             {% endif %}
 
             <div class="p-3 mt-auto border-top border-secondary">
-                <a href="/logout" class="text-danger"><i class="fas fa-sign-out-alt me-2"></i> Cerrar Sesión</a>
+                <a href="/logout" class="text-danger"><i class="fas fa-sign-out-alt me-2"></i> Salir</a>
             </div>
         </div>
 
-        <div class="col-md-10 bg-light p-4">
-            
+        <div class="col-md-10 col-12 bg-light p-4"> <div class="d-md-none d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
+                <h5 class="m-0">🛠️ GNB</h5>
+                <a href="/logout" class="text-danger"><i class="fas fa-sign-out-alt"></i></a>
+            </div>
+
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h2>
                     {% if cliente_actual %}
-                        📂 {{ cliente_actual.nombre }} <span class="text-muted fs-6">({{ cliente_actual.direccion }})</span>
+                        📂 {{ cliente_actual.nombre }}
                     {% else %}
-                        🌎 Vista Global de Activos
+                        🌎 Activos Globales
                     {% endif %}
                 </h2>
                 <div>
-                    <a href="/exportar-pdf{{ '?cliente_id=' ~ cliente_actual.id if cliente_actual else '' }}" class="btn btn-danger me-2"><i class="fas fa-file-pdf"></i> PDF</a>
-                    {% if user.username != 'invitado' %}
-                    <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalEquipo"><i class="fas fa-plus"></i> Agregar Equipo</button>
-                    {% endif %}
+                    <a href="/exportar-pdf{{ '?cliente_id=' ~ cliente_actual.id if cliente_actual else '' }}" class="btn btn-danger btn-sm">
+                        <i class="fas fa-file-pdf"></i> PDF
+                    </a>
                 </div>
             </div>
 
             <div class="row mb-4 align-items-center">
-                <div class="col-md-3">
+                <div class="col-6 col-md-3">
                     <div class="card border-0 shadow-sm">
-                        <div class="card-body d-flex align-items-center justify-content-between">
-                            <div><h6 class="text-muted mb-0">Total Equipos</h6><h3 class="mb-0" id="contadorEquipos">{{ equipos|length }}</h3></div>
-                            <div class="fs-1 text-primary opacity-25"><i class="fas fa-server"></i></div>
+                        <div class="card-body text-center p-2">
+                            <h6 class="text-muted mb-0">Total</h6>
+                            <h3 class="mb-0">{{ equipos|length }}</h3>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3">
+                <div class="col-6 col-md-3">
                     <div class="card border-0 shadow-sm">
-                        <div class="card-body py-2 d-flex align-items-center">
-                            <div class="chart-container"><canvas id="graficoEstado"></canvas></div>
-                            <div class="ms-3"><small class="text-success d-block fw-bold">● Operativo</small><small class="text-danger d-block fw-bold">● Falla</small></div>
+                        <div class="card-body p-2 d-flex align-items-center justify-content-center">
+                            <div style="height: 60px; width: 60px;">
+                                <canvas id="graficoEstado"></canvas>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-6 ms-auto">
-                    <div class="search-box"><i class="fas fa-search"></i><input type="text" id="inputBuscador" class="form-control" placeholder="Buscar..."></div>
+                <div class="col-12 col-md-6 mt-3 mt-md-0">
+                    <div class="search-box"><i class="fas fa-search"></i><input type="text" id="inputBuscador" class="form-control" placeholder="Buscar equipo..."></div>
                 </div>
             </div>
 
-            <div class="card shadow-sm">
-                <div class="card-body p-0">
-                    <table class="table table-hover mb-0" id="tablaEquipos">
+            <div class="card shadow-sm mb-5"> <div class="card-body p-0 table-responsive">
+                    <table class="table table-hover mb-0 align-middle">
                         <thead class="table-light">
                             <tr>
-                                <th>Foto</th> <th>Estado</th>
-                                <th>Nombre</th>
-                                <th>Tipo</th>
-                                <th>Serial</th>
-                                <th>Ubicación</th>
-                                <th>Obs.</th>
-                                <th class="text-end">Acciones</th>
+                                <th>Foto</th>
+                                <th>Estado</th>
+                                <th>Nombre / Serial</th> <th class="d-none d-md-table-cell">Ubicación</th> <th class="d-none d-md-table-cell">Obs.</th>
+                                <th class="text-end">Acción</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -116,56 +145,56 @@
                             <tr class="fila-equipo">
                                 <td>
                                     {% if equipo.foto %}
-                                        <img src="{{ equipo.foto }}" class="img-thumb" onclick="verFotoGrande('{{ equipo.foto }}')" title="Ver grande">
+                                        <img src="{{ equipo.foto }}" class="img-thumb" onclick="verFotoGrande('{{ equipo.foto }}')">
                                     {% else %}
-                                        <div class="text-muted text-center" style="width:40px;"><i class="fas fa-camera-retro"></i></div>
+                                        <div class="text-muted text-center" style="width:40px;"><i class="fas fa-camera"></i></div>
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if equipo.estado == 'Operativo' %} <span class="badge bg-success status-badge">OK</span>
-                                    {% else %} <span class="badge bg-danger status-badge">Falla</span> {% endif %}
+                                    {% if equipo.estado == 'Operativo' %} <span class="badge bg-success rounded-pill">OK</span>
+                                    {% else %} <span class="badge bg-danger rounded-pill">Falla</span> {% endif %}
                                 </td>
-                                <td class="fw-bold">{{ equipo.nombre }}</td>
-                                <td>{{ equipo.tipo }}</td>
-                                <td><code>{{ equipo.serial }}</code></td>
-                                <td>{{ equipo.ubicacion }}</td>
-                                <td style="max-width: 150px;" class="text-truncate" title="{{ equipo.observaciones }}"><small class="text-muted">{{ equipo.observaciones or '-' }}</small></td>
+                                <td>
+                                    <div class="fw-bold">{{ equipo.nombre }}</div>
+                                    <small class="text-muted">{{ equipo.serial }}</small>
+                                    <div class="d-md-none small text-primary">{{ equipo.ubicacion }}</div> </td>
+                                <td class="d-none d-md-table-cell">{{ equipo.ubicacion }}</td>
+                                <td class="d-none d-md-table-cell text-truncate" style="max-width: 100px;">{{ equipo.observaciones or '-' }}</td>
                                 <td class="text-end">
-                                    <button class="btn btn-sm btn-outline-info me-1" onclick="abrirHistorial({{ equipo.id }}, '{{ equipo.nombre }}')"><i class="fas fa-history"></i></button>
+                                    <button class="btn btn-sm btn-outline-info" onclick="abrirHistorial({{ equipo.id }}, '{{ equipo.nombre }}')"><i class="fas fa-history"></i></button>
                                     {% if user.username != 'invitado' %}
-                                    <button class="btn btn-sm btn-outline-primary me-1" onclick='abrirEditar({{ equipo.to_dict()|tojson }})'><i class="fas fa-edit"></i></button>
-                                    <button class="btn btn-sm btn-outline-danger" onclick="eliminarEquipo({{ equipo.id }})"><i class="fas fa-trash"></i></button>
+                                    <button class="btn btn-sm btn-outline-primary" onclick='abrirEditar({{ equipo.to_dict()|tojson }})'><i class="fas fa-edit"></i></button>
                                     {% endif %}
                                 </td>
                             </tr>
                             {% else %}
-                            <tr><td colspan="8" class="text-center py-5 text-muted">No hay equipos registrados.</td></tr>
+                            <tr><td colspan="6" class="text-center py-4">Sin equipos.</td></tr>
                             {% endfor %}
-                            <tr id="sinResultados" style="display: none;"><td colspan="8" class="text-center py-4 text-muted">🔍 No se encontraron equipos.</td></tr>
                         </tbody>
                     </table>
                 </div>
             </div>
+
         </div>
     </div>
 </div>
 
-<div class="modal fade" id="modalFoto" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-body text-center p-0">
-                <img id="imgGrande" src="" class="img-fluid rounded">
-            </div>
-        </div>
-    </div>
+{% if user.username != 'invitado' %}
+<div class="fab-container">
+    <button class="btn-fab" data-bs-toggle="modal" data-bs-target="#modalEquipo" title="Agregar Equipo">
+        <i class="fas fa-plus"></i>
+    </button>
 </div>
+{% endif %}
+
+<div class="modal fade" id="modalFoto" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-body text-center p-0"><img id="imgGrande" src="" class="img-fluid rounded"></div></div></div></div>
 
 <div class="modal fade" id="modalUsuarios" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header"><h5 class="modal-title">👥 Usuarios</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body">
-                <div class="card mb-3 bg-light border-0"><div class="card-body">
+                <div class="card mb-3 bg-light border-0"><div class="card-body p-2">
                     <form id="formUsuario">
                         <div class="input-group mb-2"><span class="input-group-text"><i class="fas fa-user"></i></span><input type="text" class="form-control" name="username" placeholder="Usuario" required></div>
                         <div class="input-group mb-2"><span class="input-group-text"><i class="fas fa-key"></i></span><input type="password" class="form-control" name="password" placeholder="Contraseña" required></div>
@@ -178,20 +207,7 @@
     </div>
 </div>
 
-<div class="modal fade" id="modalCliente" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header"><h5 class="modal-title">Nuevo Cliente</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-            <div class="modal-body">
-                <form id="formCliente">
-                    <div class="mb-3"><label>Nombre</label><input type="text" class="form-control" name="nombre" required></div>
-                    <div class="mb-3"><label>Dirección</label><input type="text" class="form-control" name="direccion"></div>
-                    <button type="submit" class="btn btn-primary w-100">Guardar</button>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
+<div class="modal fade" id="modalCliente" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Nuevo Cliente</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="formCliente"><div class="mb-3"><label>Nombre</label><input type="text" class="form-control" name="nombre" required></div><div class="mb-3"><label>Dirección</label><input type="text" class="form-control" name="direccion"></div><button type="submit" class="btn btn-primary w-100">Guardar</button></form></div></div></div></div>
 
 <div class="modal fade" id="modalEquipo" tabindex="-1">
     <div class="modal-dialog">
@@ -200,185 +216,108 @@
             <div class="modal-body">
                 <form id="formEquipo">
                     <input type="hidden" name="id" id="equipoId">
-                    <div class="mb-3">
-                        <label>Cliente</label>
-                        <select class="form-select" name="cliente_id" id="selectCliente" required>
-                            {% for cliente in clientes %}
-                            <option value="{{ cliente.id }}" {{ 'selected' if cliente_actual and cliente_actual.id == cliente.id else '' }}>{{ cliente.nombre }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
+                    <div class="mb-3"><label>Cliente</label><select class="form-select" name="cliente_id" id="selectCliente" required>{% for cliente in clientes %}<option value="{{ cliente.id }}" {{ 'selected' if cliente_actual and cliente_actual.id == cliente.id else '' }}>{{ cliente.nombre }}</option>{% endfor %}</select></div>
                     
                     <div class="mb-3 p-2 border rounded bg-light">
-                        <label class="form-label fw-bold"><i class="fas fa-camera"></i> Foto del Equipo</label>
-                        <input type="file" class="form-control" id="inputFoto" accept="image/*">
-                        <small class="text-muted d-block mt-1">Se optimizará automáticamente.</small>
-                        <div id="previewFoto" class="mt-2 text-center" style="display:none;">
-                            <img src="" id="imgPreview" style="max-height: 100px; border-radius: 5px;">
-                            <button type="button" class="btn btn-sm btn-outline-danger mt-1" onclick="limpiarFoto()">Quitar</button>
-                        </div>
-                        <input type="hidden" id="fotoBase64"> </div>
+                        <label class="form-label fw-bold small"><i class="fas fa-camera"></i> Foto (Opcional)</label>
+                        <input type="file" class="form-control form-control-sm" id="inputFoto" accept="image/*">
+                        <div id="previewFoto" class="mt-2 text-center" style="display:none;"><img src="" id="imgPreview" style="max-height: 80px; border-radius: 5px;"><button type="button" class="btn btn-sm btn-outline-danger d-block mx-auto mt-1" onclick="limpiarFoto()">X</button></div>
+                        <input type="hidden" id="fotoBase64">
+                    </div>
 
                     <div class="row">
-                        <div class="col-md-6 mb-3"><label>Nombre</label><input type="text" class="form-control" name="nombre" required></div>
-                        <div class="col-md-6 mb-3"><label>Tipo</label><input type="text" class="form-control" name="tipo" required></div>
+                        <div class="col-6 mb-3"><label>Nombre</label><input type="text" class="form-control" name="nombre" required></div>
+                        <div class="col-6 mb-3"><label>Tipo</label><input type="text" class="form-control" name="tipo" required></div>
                     </div>
                     <div class="mb-3"><label>Serial</label><input type="text" class="form-control" name="serial" required></div>
                     <div class="mb-3"><label>Ubicación</label><input type="text" class="form-control" name="ubicacion" required></div>
                     <div class="mb-3"><label>Estado</label><select class="form-select" name="estado"><option value="Operativo">Operativo 🟢</option><option value="Falla">En Falla 🔴</option></select></div>
-                    <div class="mb-3"><label>Observaciones</label><textarea class="form-control" name="observaciones" rows="2"></textarea></div>
-                    <button type="submit" class="btn btn-success w-100">Guardar Equipo</button>
+                    <div class="mb-3"><label>Notas</label><textarea class="form-control" name="observaciones" rows="2"></textarea></div>
+                    <button type="submit" class="btn btn-success w-100">Guardar</button>
                 </form>
             </div>
         </div>
     </div>
 </div>
 
-<div class="modal fade" id="modalHistorial" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header bg-light"><h5 class="modal-title">📜 Historial: <span id="tituloHistorialEquipo" class="fw-bold"></span></h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-            <div class="modal-body">
-                {% if user.username != 'invitado' %}
-                <div class="card mb-4 border-0 bg-light"><div class="card-body">
-                    <form id="formHistorial">
-                        <input type="hidden" id="historialEquipoId">
-                        <div class="input-group"><textarea class="form-control" id="descHistorial" rows="1" placeholder="Nota..." required></textarea><button class="btn btn-primary" type="submit">Guardar</button></div>
-                    </form>
-                </div></div>
-                {% endif %}
-                <div id="listaEventos" class="list-group list-group-flush"></div>
-            </div>
-        </div>
-    </div>
-</div>
+<div class="modal fade" id="modalHistorial" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content"><div class="modal-header bg-light"><h5 class="modal-title">📜 Historial: <span id="tituloHistorialEquipo" class="fw-bold"></span></h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body">{% if user.username != 'invitado' %}<div class="card mb-4 border-0 bg-light"><div class="card-body p-2"><form id="formHistorial"><input type="hidden" id="historialEquipoId"><div class="input-group"><textarea class="form-control" id="descHistorial" rows="1" placeholder="Nota..." required></textarea><button class="btn btn-primary" type="submit">Guardar</button></div></form></div></div>{% endif %}<div id="listaEventos" class="list-group list-group-flush"></div></div></div></div></div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
-    // --- LÓGICA DE COMPRESIÓN DE IMAGEN ---
+    // --- REGISTRO DEL SERVICE WORKER (PWA) ---
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register("{{ url_for('static', filename='sw.js') }}")
+                .then(reg => console.log('SW registrado: ', reg.scope))
+                .catch(err => console.log('SW falló: ', err));
+        });
+    }
+
+    // --- LÓGICA DE FOTOS (Igual que antes) ---
     document.getElementById('inputFoto').addEventListener('change', function(e) {
         const file = e.target.files[0];
         if (!file) return;
-
         const reader = new FileReader();
         reader.readAsDataURL(file);
         reader.onload = function(event) {
             const img = new Image();
             img.src = event.target.result;
             img.onload = function() {
-                // Crear Canvas para redimensionar
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
-                
-                // Redimensionar a máximo 800px de ancho (mantiene proporción)
                 const MAX_WIDTH = 800;
                 let width = img.width;
                 let height = img.height;
-
-                if (width > MAX_WIDTH) {
-                    height *= MAX_WIDTH / width;
-                    width = MAX_WIDTH;
-                }
-
-                canvas.width = width;
-                canvas.height = height;
+                if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
+                canvas.width = width; canvas.height = height;
                 ctx.drawImage(img, 0, 0, width, height);
-
-                // Convertir a Base64 JPEG calidad 70%
                 const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-                
-                // Guardar en el input oculto y mostrar preview
                 document.getElementById('fotoBase64').value = dataUrl;
                 document.getElementById('imgPreview').src = dataUrl;
                 document.getElementById('previewFoto').style.display = 'block';
             }
         }
     });
+    function limpiarFoto() { document.getElementById('inputFoto').value=''; document.getElementById('fotoBase64').value=''; document.getElementById('previewFoto').style.display='none'; }
+    function verFotoGrande(src) { document.getElementById('imgGrande').src=src; new bootstrap.Modal(document.getElementById('modalFoto')).show(); }
 
-    function limpiarFoto() {
-        document.getElementById('inputFoto').value = '';
-        document.getElementById('fotoBase64').value = '';
-        document.getElementById('previewFoto').style.display = 'none';
-    }
-
-    function verFotoGrande(src) {
-        document.getElementById('imgGrande').src = src;
-        new bootstrap.Modal(document.getElementById('modalFoto')).show();
-    }
-
-    // --- GRÁFICOS Y OTROS (Igual que antes) ---
+    // --- GRÁFICOS ---
     const estados = {{ equipos | map(attribute='estado') | list | tojson }};
     const conteoOperativo = estados.filter(e => e === 'Operativo').length;
     const conteoFalla = estados.filter(e => e === 'Falla').length;
-    new Chart(document.getElementById('graficoEstado').getContext('2d'), {
-        type: 'doughnut',
-        data: { labels: ['Operativo', 'Falla'], datasets: [{ data: [conteoOperativo, conteoFalla], backgroundColor: ['#198754', '#dc3545'], borderWidth: 0 }] },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, cutout: '70%' }
-    });
+    new Chart(document.getElementById('graficoEstado').getContext('2d'), { type: 'doughnut', data: { labels: ['OK', 'Falla'], datasets: [{ data: [conteoOperativo, conteoFalla], backgroundColor: ['#198754', '#dc3545'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, cutout: '70%' } });
 
+    // --- BUSCADOR ---
     document.getElementById('inputBuscador').addEventListener('keyup', function() {
         let texto = this.value.toLowerCase();
-        let hay = false;
-        document.querySelectorAll('.fila-equipo').forEach(f => {
-            if(f.innerText.toLowerCase().includes(texto)) { f.style.display=''; hay=true; } else f.style.display='none';
-        });
-        document.getElementById('sinResultados').style.display = hay ? 'none':'';
+        document.querySelectorAll('.fila-equipo').forEach(f => { f.style.display = f.innerText.toLowerCase().includes(texto) ? '' : 'none'; });
     });
 
-    // --- FORMULARIO EQUIPO (Actualizado para enviar foto) ---
+    // --- FORMULARIO EQUIPO ---
     document.getElementById('formEquipo').onsubmit = async (e) => {
         e.preventDefault();
         const id = document.getElementById('equipoId').value;
         const data = {
-            cliente_id: document.getElementById('selectCliente').value,
-            nombre: e.target.nombre.value,
-            tipo: e.target.tipo.value,
-            serial: e.target.serial.value,
-            ubicacion: e.target.ubicacion.value,
-            estado: e.target.estado.value,
-            observaciones: e.target.observaciones.value,
-            foto: document.getElementById('fotoBase64').value // Enviar foto procesada
+            cliente_id: document.getElementById('selectCliente').value, nombre: e.target.nombre.value, tipo: e.target.tipo.value,
+            serial: e.target.serial.value, ubicacion: e.target.ubicacion.value, estado: e.target.estado.value,
+            observaciones: e.target.observaciones.value, foto: document.getElementById('fotoBase64').value
         };
-        const metodo = id ? 'PUT' : 'POST';
-        const url = id ? `/api/equipos/${id}` : '/api/equipos';
-        const res = await fetch(url, { method: metodo, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
-        if(res.ok) window.location.reload();
-        else alert("Error al guardar");
+        const res = await fetch(id ? `/api/equipos/${id}` : '/api/equipos', { method: id ? 'PUT' : 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
+        if(res.ok) window.location.reload(); else alert("Error al guardar");
     };
 
     window.abrirEditar = (equipo) => {
         document.getElementById('equipoId').value = equipo.id;
-        document.getElementById('tituloModalEquipo').innerText = 'Editar Equipo';
+        document.getElementById('tituloModalEquipo').innerText = 'Editar';
         const form = document.getElementById('formEquipo');
-        form.nombre.value = equipo.nombre;
-        form.tipo.value = equipo.tipo;
-        form.serial.value = equipo.serial;
-        form.ubicacion.value = equipo.ubicacion;
-        form.estado.value = equipo.estado;
-        form.observaciones.value = equipo.observaciones || '';
+        form.nombre.value = equipo.nombre; form.tipo.value = equipo.tipo; form.serial.value = equipo.serial;
+        form.ubicacion.value = equipo.ubicacion; form.estado.value = equipo.estado; form.observaciones.value = equipo.observaciones || '';
         document.getElementById('selectCliente').value = equipo.cliente_id;
-        
-        // Cargar foto existente si hay
         limpiarFoto();
-        if(equipo.foto) {
-            document.getElementById('fotoBase64').value = equipo.foto;
-            document.getElementById('imgPreview').src = equipo.foto;
-            document.getElementById('previewFoto').style.display = 'block';
-        }
-
+        if(equipo.foto) { document.getElementById('fotoBase64').value = equipo.foto; document.getElementById('imgPreview').src = equipo.foto; document.getElementById('previewFoto').style.display = 'block'; }
         new bootstrap.Modal(document.getElementById('modalEquipo')).show();
-    };
-
-    // (El resto de funciones JS de usuarios, clientes, historial se mantienen igual...)
-    // INCLUYE AQUÍ LAS FUNCIONES DE USUARIOS Y CLIENTES DEL PASO ANTERIOR O COPIA EL SCRIPT COMPLETO DE ABAJO
-    
-    // --- CLIENTES ---
-    document.getElementById('formCliente').onsubmit = async (e) => {
-        e.preventDefault();
-        const res = await fetch('/api/clientes', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ nombre: e.target.nombre.value, direccion: e.target.direccion.value }) });
-        if(res.ok) window.location.reload();
     };
 
     // --- USUARIOS ---
@@ -401,7 +340,7 @@
     };
     window.borrarUser = async(id) => { if(confirm('¿Borrar?')) { await fetch(`/api/usuarios/${id}`, {method:'DELETE'}); abrirUsuarios(); }};
 
-    // --- HISTORIAL ---
+    // --- HISTORIAL, CLIENTES, ETC (Simplificado) ---
     const modalHistorial = new bootstrap.Modal(document.getElementById('modalHistorial'));
     window.abrirHistorial = async (id, nombre) => {
         document.getElementById('tituloHistorialEquipo').innerText = nombre;
@@ -422,7 +361,7 @@
             abrirHistorial(id, document.getElementById('tituloHistorialEquipo').innerText);
         }
     }
-    window.eliminarEquipo = async(id) => { if(confirm('¿Seguro?')) { await fetch(`/api/equipos/${id}`, {method:'DELETE'}); window.location.reload(); }};
+    document.getElementById('formCliente').onsubmit = async (e) => { const res = await fetch('/api/clientes', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ nombre: e.target.nombre.value, direccion: e.target.direccion.value }) }); if(res.ok) window.location.reload(); };
 </script>
 
 </body>
