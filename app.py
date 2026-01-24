@@ -11,6 +11,7 @@ from reportlab.lib.utils import ImageReader
 import qrcode
 import io
 import base64 
+import pytz
 
 app = Flask(__name__)
 app.secret_key = 'super_secreto_clave_segura_gnb'
@@ -80,7 +81,7 @@ class Equipo(db.Model):
 
 class Mantenimiento(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    fecha = db.Column(db.DateTime, default=datetime.utcnow)
+    fecha = db.Column(db.DateTime, default=lambda: datetime.now(pytz.timezone('America/Bogota')))
     descripcion = db.Column(db.String(500), nullable=False)
     usuario = db.Column(db.String(100), nullable=False)
     equipo_id = db.Column(db.Integer, db.ForeignKey('equipo.id'), nullable=False)

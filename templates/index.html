@@ -4,10 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#2c3e50">
-    <title>RFL Mantenimiento</title>
+    <title>RFL Mantenimiento</title> 
     
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
-    
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     
@@ -21,44 +20,20 @@
         .search-box input { padding-left: 40px; border-radius: 20px; }
         .chart-container { position: relative; height: 100px; width: 100px; margin: 0 auto; }
         .historial-item { border-left: 3px solid #0d6efd; background-color: #f8f9fa; }
-        .historial-meta { font-size: 0.85rem; color: #6c757d; }
-        .user-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee; }
         .img-thumb { width: 40px; height: 40px; object-fit: cover; border-radius: 5px; cursor: pointer; border: 1px solid #ddd; }
         
-        /* --- ESTILOS DEL BOTÓN FLOTANTE (FAB) --- */
-        .fab-container {
-            position: fixed;
-            bottom: 30px;
-            right: 30px;
-            z-index: 1000;
-        }
-        .btn-fab {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            background-color: #198754; /* Verde Éxito */
-            color: white;
-            border: none;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-            font-size: 24px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: transform 0.2s;
-        }
-        .btn-fab:hover {
-            transform: scale(1.1);
-            background-color: #157347;
-            color: white;
-        }
-        /* Ocultar sidebar en móviles pequeños si quisieras, por ahora lo dejamos */
+        /* FAB */
+        .fab-container { position: fixed; bottom: 30px; right: 30px; z-index: 1000; }
+        .btn-fab { width: 60px; height: 60px; border-radius: 50%; background-color: #198754; color: white; border: none; box-shadow: 0 4px 10px rgba(0,0,0,0.3); font-size: 24px; display: flex; align-items: center; justify-content: center; transition: transform 0.2s; }
+        .btn-fab:hover { transform: scale(1.1); background-color: #157347; color: white; }
     </style>
 </head>
 <body>
 
 <div class="container-fluid">
     <div class="row">
-        <div class="col-md-2 sidebar p-0 d-flex flex-column d-none d-md-flex"> <div class="p-3 text-center border-bottom border-secondary">
+        <div class="col-md-2 sidebar p-0 d-flex flex-column d-none d-md-flex">
+            <div class="p-3 text-center border-bottom border-secondary">
                 <h4>🛠️ RFL Mant.</h4>
                 <small class="text-muted">Hola, {{ user.username }}</small>
             </div>
@@ -87,7 +62,9 @@
             </div>
         </div>
 
-        <div class="col-md-10 col-12 bg-light p-4"> <div class="d-md-none d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
+        <div class="col-md-10 col-12 bg-light p-4">
+            
+            <div class="d-md-none d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
                 <h5 class="m-0">🛠️ RFL</h5>
                 <a href="/logout" class="text-danger"><i class="fas fa-sign-out-alt"></i></a>
             </div>
@@ -130,13 +107,17 @@
                 </div>
             </div>
 
-            <div class="card shadow-sm mb-5"> <div class="card-body p-0 table-responsive">
+            <div class="card shadow-sm mb-5">
+                <div class="card-body p-0 table-responsive">
                     <table class="table table-hover mb-0 align-middle">
                         <thead class="table-light">
                             <tr>
                                 <th>Foto</th>
                                 <th>Estado</th>
-                                <th>Nombre / Serial</th> <th class="d-none d-md-table-cell">Ubicación</th> <th class="d-none d-md-table-cell">Obs.</th>
+                                <th>Nombre / Serial</th>
+                                <th>Tipo</th> 
+                                <th class="d-none d-md-table-cell">Ubicación</th>
+                                <th class="d-none d-md-table-cell">Obs.</th>
                                 <th class="text-end">Acción</th>
                             </tr>
                         </thead>
@@ -157,7 +138,9 @@
                                 <td>
                                     <div class="fw-bold">{{ equipo.nombre }}</div>
                                     <small class="text-muted">{{ equipo.serial }}</small>
-                                    <div class="d-md-none small text-primary">{{ equipo.ubicacion }}</div> </td>
+                                    <div class="d-md-none small text-primary">{{ equipo.ubicacion }}</div>
+                                </td>
+                                <td>{{ equipo.tipo }}</td>
                                 <td class="d-none d-md-table-cell">{{ equipo.ubicacion }}</td>
                                 <td class="d-none d-md-table-cell text-truncate" style="max-width: 100px;">{{ equipo.observaciones or '-' }}</td>
                                 <td class="text-end">
@@ -168,7 +151,7 @@
                                 </td>
                             </tr>
                             {% else %}
-                            <tr><td colspan="6" class="text-center py-4">Sin equipos.</td></tr>
+                            <tr><td colspan="7" class="text-center py-4">Sin equipos.</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
@@ -246,121 +229,54 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
-    // --- REGISTRO DEL SERVICE WORKER (PWA) ---
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register("{{ url_for('static', filename='sw.js') }}")
-                .then(reg => console.log('SW registrado: ', reg.scope))
-                .catch(err => console.log('SW falló: ', err));
-        });
-    }
-
-    // --- LÓGICA DE FOTOS (Igual que antes) ---
+    if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register("{{ url_for('static', filename='sw.js') }}").then(reg => console.log('SW ok')).catch(err => console.log('SW fail')); }); }
     document.getElementById('inputFoto').addEventListener('change', function(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
+        const file = e.target.files[0]; if (!file) return;
+        const reader = new FileReader(); reader.readAsDataURL(file);
         reader.onload = function(event) {
-            const img = new Image();
-            img.src = event.target.result;
+            const img = new Image(); img.src = event.target.result;
             img.onload = function() {
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                const MAX_WIDTH = 800;
-                let width = img.width;
-                let height = img.height;
+                const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d');
+                const MAX_WIDTH = 800; let width = img.width; let height = img.height;
                 if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
-                canvas.width = width; canvas.height = height;
-                ctx.drawImage(img, 0, 0, width, height);
+                canvas.width = width; canvas.height = height; ctx.drawImage(img, 0, 0, width, height);
                 const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-                document.getElementById('fotoBase64').value = dataUrl;
-                document.getElementById('imgPreview').src = dataUrl;
-                document.getElementById('previewFoto').style.display = 'block';
+                document.getElementById('fotoBase64').value = dataUrl; document.getElementById('imgPreview').src = dataUrl; document.getElementById('previewFoto').style.display = 'block';
             }
         }
     });
     function limpiarFoto() { document.getElementById('inputFoto').value=''; document.getElementById('fotoBase64').value=''; document.getElementById('previewFoto').style.display='none'; }
     function verFotoGrande(src) { document.getElementById('imgGrande').src=src; new bootstrap.Modal(document.getElementById('modalFoto')).show(); }
 
-    // --- GRÁFICOS ---
     const estados = {{ equipos | map(attribute='estado') | list | tojson }};
     const conteoOperativo = estados.filter(e => e === 'Operativo').length;
     const conteoFalla = estados.filter(e => e === 'Falla').length;
     new Chart(document.getElementById('graficoEstado').getContext('2d'), { type: 'doughnut', data: { labels: ['OK', 'Falla'], datasets: [{ data: [conteoOperativo, conteoFalla], backgroundColor: ['#198754', '#dc3545'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, cutout: '70%' } });
 
-    // --- BUSCADOR ---
-    document.getElementById('inputBuscador').addEventListener('keyup', function() {
-        let texto = this.value.toLowerCase();
-        document.querySelectorAll('.fila-equipo').forEach(f => { f.style.display = f.innerText.toLowerCase().includes(texto) ? '' : 'none'; });
-    });
+    document.getElementById('inputBuscador').addEventListener('keyup', function() { let texto = this.value.toLowerCase(); document.querySelectorAll('.fila-equipo').forEach(f => { f.style.display = f.innerText.toLowerCase().includes(texto) ? '' : 'none'; }); });
 
-    // --- FORMULARIO EQUIPO ---
     document.getElementById('formEquipo').onsubmit = async (e) => {
-        e.preventDefault();
-        const id = document.getElementById('equipoId').value;
-        const data = {
-            cliente_id: document.getElementById('selectCliente').value, nombre: e.target.nombre.value, tipo: e.target.tipo.value,
-            serial: e.target.serial.value, ubicacion: e.target.ubicacion.value, estado: e.target.estado.value,
-            observaciones: e.target.observaciones.value, foto: document.getElementById('fotoBase64').value
-        };
+        e.preventDefault(); const id = document.getElementById('equipoId').value;
+        const data = { cliente_id: document.getElementById('selectCliente').value, nombre: e.target.nombre.value, tipo: e.target.tipo.value, serial: e.target.serial.value, ubicacion: e.target.ubicacion.value, estado: e.target.estado.value, observaciones: e.target.observaciones.value, foto: document.getElementById('fotoBase64').value };
         const res = await fetch(id ? `/api/equipos/${id}` : '/api/equipos', { method: id ? 'PUT' : 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
         if(res.ok) window.location.reload(); else alert("Error al guardar");
     };
 
     window.abrirEditar = (equipo) => {
-        document.getElementById('equipoId').value = equipo.id;
-        document.getElementById('tituloModalEquipo').innerText = 'Editar';
-        const form = document.getElementById('formEquipo');
-        form.nombre.value = equipo.nombre; form.tipo.value = equipo.tipo; form.serial.value = equipo.serial;
-        form.ubicacion.value = equipo.ubicacion; form.estado.value = equipo.estado; form.observaciones.value = equipo.observaciones || '';
-        document.getElementById('selectCliente').value = equipo.cliente_id;
-        limpiarFoto();
-        if(equipo.foto) { document.getElementById('fotoBase64').value = equipo.foto; document.getElementById('imgPreview').src = equipo.foto; document.getElementById('previewFoto').style.display = 'block'; }
+        document.getElementById('equipoId').value = equipo.id; document.getElementById('tituloModalEquipo').innerText = 'Editar';
+        const form = document.getElementById('formEquipo'); form.nombre.value = equipo.nombre; form.tipo.value = equipo.tipo; form.serial.value = equipo.serial; form.ubicacion.value = equipo.ubicacion; form.estado.value = equipo.estado; form.observaciones.value = equipo.observaciones || ''; document.getElementById('selectCliente').value = equipo.cliente_id;
+        limpiarFoto(); if(equipo.foto) { document.getElementById('fotoBase64').value = equipo.foto; document.getElementById('imgPreview').src = equipo.foto; document.getElementById('previewFoto').style.display = 'block'; }
         new bootstrap.Modal(document.getElementById('modalEquipo')).show();
     };
 
-    // --- USUARIOS ---
     const modalUsuarios = new bootstrap.Modal(document.getElementById('modalUsuarios'));
-    window.abrirUsuarios = async () => {
-        modalUsuarios.show();
-        const res = await fetch('/api/usuarios');
-        const usuarios = await res.json();
-        const div = document.getElementById('listaUsuarios');
-        div.innerHTML = '';
-        usuarios.forEach(u => {
-            const btn = (u.username=='admin'||u.username=='invitado') ? '<span class="badge bg-secondary">Sistema</span>' : `<button class="btn btn-sm btn-outline-danger" onclick="borrarUser(${u.id})"><i class="fas fa-trash"></i></button>`;
-            div.innerHTML += `<div class="user-item"><span><i class="fas fa-user-circle me-2"></i>${u.username}</span>${btn}</div>`;
-        });
-    };
-    document.getElementById('formUsuario').onsubmit = async (e) => {
-        e.preventDefault();
-        const res = await fetch('/api/usuarios', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ username: e.target.username.value, password: e.target.password.value }) });
-        if(res.ok) { e.target.reset(); abrirUsuarios(); } else alert("Error");
-    };
+    window.abrirUsuarios = async () => { modalUsuarios.show(); const res = await fetch('/api/usuarios'); const usuarios = await res.json(); const div = document.getElementById('listaUsuarios'); div.innerHTML = ''; usuarios.forEach(u => { const btn = (u.username=='admin'||u.username=='invitado') ? '<span class="badge bg-secondary">Sistema</span>' : `<button class="btn btn-sm btn-outline-danger" onclick="borrarUser(${u.id})"><i class="fas fa-trash"></i></button>`; div.innerHTML += `<div class="user-item"><span><i class="fas fa-user-circle me-2"></i>${u.username}</span>${btn}</div>`; }); };
+    document.getElementById('formUsuario').onsubmit = async (e) => { e.preventDefault(); const res = await fetch('/api/usuarios', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ username: e.target.username.value, password: e.target.password.value }) }); if(res.ok) { e.target.reset(); abrirUsuarios(); } else alert("Error"); };
     window.borrarUser = async(id) => { if(confirm('¿Borrar?')) { await fetch(`/api/usuarios/${id}`, {method:'DELETE'}); abrirUsuarios(); }};
 
-    // --- HISTORIAL, CLIENTES, ETC (Simplificado) ---
     const modalHistorial = new bootstrap.Modal(document.getElementById('modalHistorial'));
-    window.abrirHistorial = async (id, nombre) => {
-        document.getElementById('tituloHistorialEquipo').innerText = nombre;
-        document.getElementById('historialEquipoId').value = id;
-        modalHistorial.show();
-        const res = await fetch(`/api/mantenimientos/${id}`);
-        const historial = await res.json();
-        const div = document.getElementById('listaEventos');
-        div.innerHTML = historial.length ? '' : '<div class="text-center text-muted p-3">Vacío</div>';
-        historial.forEach(h => div.innerHTML += `<div class="list-group-item historial-item mb-2 rounded"><div class="d-flex justify-content-between"><small class="fw-bold text-primary">${h.usuario}</small><small class="historial-meta">${h.fecha}</small></div><p class="mb-0">${h.descripcion}</p></div>`);
-    };
-    if(document.getElementById('formHistorial')){
-        document.getElementById('formHistorial').onsubmit = async(e)=>{
-            e.preventDefault();
-            const id=document.getElementById('historialEquipoId').value;
-            await fetch('/api/mantenimientos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({equipo_id:id, descripcion:document.getElementById('descHistorial').value})});
-            document.getElementById('descHistorial').value='';
-            abrirHistorial(id, document.getElementById('tituloHistorialEquipo').innerText);
-        }
-    }
+    window.abrirHistorial = async (id, nombre) => { document.getElementById('tituloHistorialEquipo').innerText = nombre; document.getElementById('historialEquipoId').value = id; modalHistorial.show(); const res = await fetch(`/api/mantenimientos/${id}`); const historial = await res.json(); const div = document.getElementById('listaEventos'); div.innerHTML = historial.length ? '' : '<div class="text-center text-muted p-3">Vacío</div>'; historial.forEach(h => div.innerHTML += `<div class="list-group-item historial-item mb-2 rounded"><div class="d-flex justify-content-between"><small class="fw-bold text-primary">${h.usuario}</small><small class="historial-meta">${h.fecha}</small></div><p class="mb-0">${h.descripcion}</p></div>`); };
+    if(document.getElementById('formHistorial')){ document.getElementById('formHistorial').onsubmit = async(e)=>{ e.preventDefault(); const id=document.getElementById('historialEquipoId').value; await fetch('/api/mantenimientos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({equipo_id:id, descripcion:document.getElementById('descHistorial').value})}); document.getElementById('descHistorial').value=''; abrirHistorial(id, document.getElementById('tituloHistorialEquipo').innerText); } }
     document.getElementById('formCliente').onsubmit = async (e) => { const res = await fetch('/api/clientes', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ nombre: e.target.nombre.value, direccion: e.target.direccion.value }) }); if(res.ok) window.location.reload(); };
 </script>
 
